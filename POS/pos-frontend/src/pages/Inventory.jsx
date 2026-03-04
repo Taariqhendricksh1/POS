@@ -53,6 +53,7 @@ export default function Inventory() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
+  const fileInputRef = useRef(null);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -176,7 +177,7 @@ export default function Inventory() {
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 960 } },
       });
       streamRef.current = stream;
       setShowCamera(true);
@@ -215,6 +216,31 @@ export default function Inventory() {
 
   const removePhoto = () => {
     setFormData((prev) => ({ ...prev, imageUrl: '' }));
+  };
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Resize and compress
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxW = 800;
+        const scale = Math.min(1, maxW / img.width);
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+        setFormData((prev) => ({ ...prev, imageUrl: dataUrl }));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    // Reset input so the same file can be selected again
+    e.target.value = '';
   };
 
   // --- Submit ---
@@ -671,7 +697,7 @@ export default function Inventory() {
                       autoPlay
                       playsInline
                       muted
-                      style={{ width: '100%', maxHeight: 240, borderRadius: 8, background: '#000', objectFit: 'cover' }}
+                      style={{ width: '100%', aspectRatio: '4/3', borderRadius: 8, background: '#000', objectFit: 'cover', display: 'block' }}
                     />
                     <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                       <button type="button" className="btn btn-success" style={{ flex: 1 }} onClick={capturePhoto}>
@@ -683,9 +709,21 @@ export default function Inventory() {
                     </div>
                   </div>
                 ) : (
-                  <button type="button" className="btn btn-outline" onClick={startCamera} style={{ marginTop: 4, width: '100%' }}>
-                    <Camera size={16} /> Take Photo
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <button type="button" className="btn btn-outline" onClick={startCamera} style={{ flex: 1 }}>
+                      <Camera size={16} /> Take Photo
+                    </button>
+                    <button type="button" className="btn btn-outline" onClick={() => fileInputRef.current?.click()} style={{ flex: 1 }}>
+                      <ImageIcon size={16} /> Upload
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: 'none' }}
+                      onChange={handleFileUpload}
+                    />
+                  </div>
                 )}
                 <canvas ref={canvasRef} style={{ display: 'none' }} />
               </div>
