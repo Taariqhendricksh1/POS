@@ -238,6 +238,39 @@ public class OrderService
         await _orders.Find(o => o.CreatedAt >= from && o.CreatedAt <= to)
             .SortByDescending(o => o.CreatedAt).ToListAsync();
 
+    public async Task<SalesSummary> GetSalesSummaryAsync(DateTime from, DateTime to)
+    {
+        var orders = await _orders.Find(o =>
+            o.Status == OrderStatus.Completed &&
+            o.CompletedAt >= from &&
+            o.CompletedAt <= to
+        ).ToListAsync();
+
+        var totalSales = orders.Sum(o => o.Total);
+        var totalOrders = orders.Count;
+        var totalItems = orders.Sum(o => o.Items.Sum(i => i.Quantity));
+        var totalDiscount = orders.Sum(o => o.DiscountTotal);
+        var totalTax = orders.Sum(o => o.TaxAmount);
+        var averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+
+        var paymentBreakdown = orders
+            .GroupBy(o => o.PaymentMethod)
+            .ToDictionary(g => g.Key.ToString(), g => g.Sum(o => o.Total));
+
+        return new SalesSummary
+        {
+            From = from,
+            To = to,
+            TotalSales = totalSales,
+            TotalOrders = totalOrders,
+            TotalItems = totalItems,
+            TotalDiscount = totalDiscount,
+            TotalTax = totalTax,
+            AverageOrderValue = averageOrderValue,
+            PaymentBreakdown = paymentBreakdown
+        };
+    }
+
     private void RecalculateTotals(Order order)
     {
         order.Subtotal = order.Items.Sum(i => i.Quantity * i.UnitPrice);

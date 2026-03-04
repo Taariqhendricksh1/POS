@@ -32,6 +32,7 @@ export const orderApi = {
   getById: (id) => api.get(`/orders/${id}`),
   getByInvoice: (invoiceNumber) => api.get(`/orders/invoice/${invoiceNumber}`),
   getRecent: (limit = 50) => api.get(`/orders/recent?limit=${limit}`),
+  getSalesSummary: (from, to) => api.get('/orders/sales-summary', { params: { from, to } }),
   addItem: (orderId, barcode) => api.post(`/orders/${orderId}/items`, { barcode }),
   updateItemQty: (orderId, productId, quantity) =>
     api.put(`/orders/${orderId}/items/${productId}`, { quantity }),

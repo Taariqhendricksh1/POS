@@ -97,6 +97,15 @@ public class OrdersController : ControllerBase
         return Ok(order);
     }
 
+    [HttpGet("sales-summary")]
+    public async Task<ActionResult<SalesSummary>> GetSalesSummary([FromQuery] DateTime? from, [FromQuery] DateTime? to)
+    {
+        var fromDate = from ?? DateTime.UtcNow.Date;
+        var toDate = to ?? DateTime.UtcNow.Date.AddDays(1).AddTicks(-1);
+        var summary = await _orderService.GetSalesSummaryAsync(fromDate, toDate);
+        return Ok(summary);
+    }
+
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteOrder(string id)
     {

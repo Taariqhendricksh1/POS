@@ -9,8 +9,19 @@ import {
   ArrowRight,
   Store,
   ChevronDown,
+  DollarSign,
+  Calendar,
+  CreditCard,
+  Banknote,
+  Building2,
+  BarChart3,
+  Receipt,
 } from 'lucide-react';
-import { productApi } from '../api';
+import { productApi, orderApi } from '../api';
+
+function formatDate(date) {
+  return date.toISOString().split('T')[0];
+}
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
@@ -18,6 +29,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [shops, setShops] = useState([]);
   const [selectedShop, setSelectedShop] = useState('');
+  // Sales summary
+  const [salesSummary, setSalesSummary] = useState(null);
+  const [salesLoading, setSalesLoading] = useState(false);
+  const [dateFrom, setDateFrom] = useState(formatDate(new Date()));
+  const [dateTo, setDateTo] = useState(formatDate(new Date()));
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,6 +43,10 @@ export default function Dashboard() {
   useEffect(() => {
     loadDashboard();
   }, [selectedShop]);
+
+  useEffect(() => {
+    loadSalesSummary();
+  }, []);
 
   const loadShops = async () => {
     try {
@@ -52,6 +72,26 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadSalesSummary = async (from, to) => {
+    setSalesLoading(true);
+    try {
+      const fromParam = (from || dateFrom) + 'T00:00:00Z';
+      const toParam = (to || dateTo) + 'T23:59:59Z';
+      const res = await orderApi.getSalesSummary(fromParam, toParam);
+      setSalesSummary(res.data);
+    } catch (err) {
+      console.error('Sales summary load error:', err);
+    } finally {
+      setSalesLoading(false);
+    }
+  };
+
+  const handleDateChange = (newFrom, newTo) => {
+    setDateFrom(newFrom);
+    setDateTo(newTo);
+    loadSalesSummary(newFrom, newTo);
   };
 
   if (loading) {
@@ -127,6 +167,157 @@ export default function Dashboard() {
         <button className="btn btn-outline" onClick={() => navigate('/inventory')} style={{ flex: 1 }}>
           <Package size={18} /> Inventory
         </button>
+      </div>
+
+      {/* Sales Summary */}
+      <div style={{ marginBottom: 20 }}>
+        <h3 style={{ fontSize: 16, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <BarChart3 size={16} color="var(--primary)" />
+          Sales Summary
+        </h3>
+
+        {/* Date Range Picker */}
+        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Calendar size={16} color="var(--text-secondary)" />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => handleDateChange(e.target.value, dateTo)}
+                style={{
+                  flex: 1,
+                  padding: '8px 10px',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 13,
+                  background: 'var(--bg)',
+                  color: 'var(--text)',
+                  minWidth: 0,
+                }}
+              />
+              <span style={{ color: 'var(--text-secondary)', fontSize: 13, flexShrink: 0 }}>to</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => handleDateChange(dateFrom, e.target.value)}
+                style={{
+                  flex: 1,
+                  padding: '8px 10px',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: 13,
+                  background: 'var(--bg)',
+                  color: 'var(--text)',
+                  minWidth: 0,
+                }}
+              />
+            </div>
+          </div>
+          {/* Quick date presets */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+            {[
+              { label: 'Today', fn: () => { const d = formatDate(new Date()); handleDateChange(d, d); } },
+              { label: 'Yesterday', fn: () => { const d = new Date(); d.setDate(d.getDate() - 1); const s = formatDate(d); handleDateChange(s, s); } },
+              { label: 'This Week', fn: () => { const now = new Date(); const day = now.getDay(); const start = new Date(now); start.setDate(now.getDate() - (day === 0 ? 6 : day - 1)); handleDateChange(formatDate(start), formatDate(now)); } },
+              { label: 'This Month', fn: () => { const now = new Date(); const start = new Date(now.getFullYear(), now.getMonth(), 1); handleDateChange(formatDate(start), formatDate(now)); } },
+              { label: 'Last 30 Days', fn: () => { const now = new Date(); const start = new Date(); start.setDate(now.getDate() - 30); handleDateChange(formatDate(start), formatDate(now)); } },
+            ].map((preset) => (
+              <button
+                key={preset.label}
+                onClick={preset.fn}
+                style={{
+                  padding: '4px 10px',
+                  fontSize: 12,
+                  border: '1px solid var(--border)',
+                  borderRadius: 20,
+                  background: 'var(--bg)',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Sales Stats */}
+        {salesLoading ? (
+          <div style={{ textAlign: 'center', padding: 30 }}>
+            <div className="spinner" style={{ borderTopColor: 'var(--primary)', borderColor: 'var(--border)' }} />
+          </div>
+        ) : salesSummary ? (
+          <>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-label">
+                  <DollarSign size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                  Total Sales
+                </div>
+                <div className="stat-value success">R{salesSummary.totalSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">
+                  <Receipt size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                  Orders
+                </div>
+                <div className="stat-value">{salesSummary.totalOrders}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">
+                  <ShoppingCart size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                  Items Sold
+                </div>
+                <div className="stat-value">{salesSummary.totalItems}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">
+                  <TrendingUp size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                  Avg Order
+                </div>
+                <div className="stat-value">R{salesSummary.averageOrderValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+            </div>
+
+            {/* Payment Breakdown & Details */}
+            {salesSummary.totalOrders > 0 && (
+              <div className="card" style={{ padding: 16, marginTop: 12 }}>
+                <h4 style={{ fontSize: 12, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10 }}>Payment Breakdown</h4>
+                {Object.entries(salesSummary.paymentBreakdown).map(([method, amount]) => (
+                  <div key={method} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14 }}>
+                      {method === 'Cash' && <Banknote size={16} color="var(--success, #16a34a)" />}
+                      {method === 'Card' && <CreditCard size={16} color="var(--primary)" />}
+                      {method === 'EFT' && <Building2 size={16} color="var(--warning, #f59e0b)" />}
+                      {method !== 'Cash' && method !== 'Card' && method !== 'EFT' && <DollarSign size={16} />}
+                      {method}
+                    </div>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>R{amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                ))}
+                {salesSummary.totalDiscount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                    <span>Total Discounts</span>
+                    <span>-R{salesSummary.totalDiscount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+                  <span>VAT (incl.)</span>
+                  <span>R{salesSummary.totalTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+            )}
+
+            {salesSummary.totalOrders === 0 && (
+              <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <Receipt size={32} style={{ marginBottom: 8, opacity: 0.4 }} />
+                <p style={{ margin: 0, fontSize: 14 }}>No completed sales for this period</p>
+              </div>
+            )}
+          </>
+        ) : null}
       </div>
 
       {/* Low Stock Alerts */}

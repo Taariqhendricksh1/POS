@@ -56,7 +56,7 @@ export default function NewSale() {
   const [newCustPhone, setNewCustPhone] = useState('');
 
   const [order, setOrder] = useState(null);
-  const [showScanner, setShowScanner] = useState(true);
+  const [showScanner, setShowScanner] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [processing, setProcessing] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -174,7 +174,7 @@ export default function NewSale() {
     try {
       const res = await orderApi.create(email, name, customerId, phone);
       setOrder(res.data);
-      setShowScanner(true);
+      setShowScanner(false);
       setStep(STEPS.SCAN);
       setEmailStatus(null);
       showToast(`Invoice ${res.data.invoiceNumber} created`, 'success');
@@ -447,7 +447,7 @@ export default function NewSale() {
               {starting ? (
                 <><span className="spinner" /> Connecting...</>
               ) : (
-                <><ScanLine size={18} /> Start Scanning Products</>
+                <><ShoppingCart size={18} /> Select Products</>
               )}
             </button>
           </form>
@@ -462,7 +462,7 @@ export default function NewSale() {
       <div>
         <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h1>Scan Items</h1>
+            <h1>Product Selection</h1>
             <p>
               {order?.invoiceNumber} •{' '}
               <span style={{ fontWeight: 500 }}>{clientName}</span>
@@ -477,24 +477,6 @@ export default function NewSale() {
           </button>
         </div>
 
-        {/* Scan Button */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowScanner(!showScanner)}
-            style={{ flex: 1 }}
-          >
-            <ScanLine size={18} /> {showScanner ? 'Hide Scanner' : 'Scan Product'}
-          </button>
-        </div>
-
-        {/* Scanner */}
-        {showScanner && (
-          <div style={{ marginBottom: 16 }}>
-            <BarcodeScanner onScan={handleScanProduct} continuous />
-          </div>
-        )}
-
         {/* Product Search */}
         <div style={{ marginBottom: 16 }}>
           <div className="search-bar">
@@ -504,6 +486,7 @@ export default function NewSale() {
               placeholder="Search product by name..."
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
+              autoFocus
             />
             {searchingProducts && (
               <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2, position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }} />
@@ -529,6 +512,24 @@ export default function NewSale() {
             </div>
           )}
         </div>
+
+        {/* Scan Product Button */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <button
+            className={`btn ${showScanner ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setShowScanner(!showScanner)}
+            style={{ flex: 1 }}
+          >
+            <ScanLine size={18} /> {showScanner ? 'Hide Scanner' : 'Scan Product'}
+          </button>
+        </div>
+
+        {/* Scanner (hidden by default) */}
+        {showScanner && (
+          <div style={{ marginBottom: 16 }}>
+            <BarcodeScanner onScan={handleScanProduct} continuous />
+          </div>
+        )}
 
         {/* Order Items */}
         {order?.items?.length > 0 ? (
