@@ -253,12 +253,13 @@ export default function Customers() {
               </div>
 
               <div className="input-group">
-                <label>Email</label>
+                <label>Email *</label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="john@example.com"
+                  required
                 />
               </div>
 

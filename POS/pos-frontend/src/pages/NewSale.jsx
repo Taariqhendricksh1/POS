@@ -224,10 +224,10 @@ export default function NewSale() {
   // Helper: is start-sale enabled?
   const canStart =
     clientMode === CLIENT_MODES.EXISTING
-      ? selectedCustomerId && clientName
+      ? selectedCustomerId && clientName && clientEmail
       : clientMode === CLIENT_MODES.NEW
-        ? newCustFirstName && newCustLastName
-        : clientName; // guest just needs a name
+        ? newCustFirstName && newCustLastName && newCustEmail
+        : clientName && clientEmail; // guest needs name + email
 
   // Step 1: Client Details
   if (step === STEPS.CLIENT) {
@@ -335,8 +335,8 @@ export default function NewSale() {
                   </div>
                 </div>
                 <div className="input-group">
-                  <label>Email</label>
-                  <input type="email" value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="john@example.com" />
+                  <label>Email *</label>
+                  <input type="email" value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="john@example.com" required />
                 </div>
                 <div className="input-group">
                   <label>Cell Number</label>
@@ -353,8 +353,8 @@ export default function NewSale() {
                   <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Walk-in Customer" required />
                 </div>
                 <div className="input-group">
-                  <label>Email</label>
-                  <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="Optional for invoice" />
+                  <label>Email *</label>
+                  <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="client@email.com" required />
                 </div>
               </>
             )}

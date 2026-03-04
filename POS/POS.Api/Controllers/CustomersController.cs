@@ -48,13 +48,13 @@ public class CustomersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Customer>> Create([FromBody] Customer customer)
     {
+        if (string.IsNullOrWhiteSpace(customer.Email))
+            return BadRequest(new { message = "Email is required" });
+
         // Check if email already exists
-        if (!string.IsNullOrWhiteSpace(customer.Email))
-        {
-            var existing = await _customerService.GetByEmailAsync(customer.Email);
-            if (existing != null)
-                return Conflict(new { message = "A customer with this email already exists", customer = existing });
-        }
+        var existing = await _customerService.GetByEmailAsync(customer.Email);
+        if (existing != null)
+            return Conflict(new { message = "A customer with this email already exists", customer = existing });
 
         var created = await _customerService.CreateAsync(customer);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
