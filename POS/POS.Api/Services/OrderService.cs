@@ -41,7 +41,7 @@ public class OrderService
         return $"{_appSettings.InvoicePrefix}-{counter.Sequence:D6}";
     }
 
-    public async Task<Order> CreateOrderAsync(string clientEmail, string clientName)
+    public async Task<Order> CreateOrderAsync(string clientEmail, string clientName, string? customerId = null, string? clientPhone = null)
     {
         var invoiceNumber = await GenerateInvoiceNumberAsync();
         var order = new Order
@@ -49,6 +49,8 @@ public class OrderService
             InvoiceNumber = invoiceNumber,
             ClientEmail = clientEmail,
             ClientName = clientName,
+            CustomerId = customerId,
+            ClientPhone = clientPhone,
             TaxRate = _appSettings.DefaultTaxRate,
             Status = OrderStatus.Pending
         };

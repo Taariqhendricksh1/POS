@@ -1,9 +1,10 @@
 import { Routes, Route, NavLink } from 'react-router-dom';
-import { ShoppingCart, Package, BarChart3, History } from 'lucide-react';
+import { ShoppingCart, Package, BarChart3, History, Users } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import NewSale from './pages/NewSale';
 import OrderHistory from './pages/OrderHistory';
+import Customers from './pages/Customers';
 import Toast from './components/Toast';
 import { ToastProvider } from './hooks/useToast';
 
@@ -14,6 +15,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/inventory" element={<Inventory />} />
+          <Route path="/customers" element={<Customers />} />
           <Route path="/sale" element={<NewSale />} />
           <Route path="/orders" element={<OrderHistory />} />
         </Routes>
@@ -27,6 +29,10 @@ export default function App() {
         <NavLink to="/inventory">
           <Package />
           <span>Inventory</span>
+        </NavLink>
+        <NavLink to="/customers">
+          <Users />
+          <span>Customers</span>
         </NavLink>
         <NavLink to="/sale">
           <ShoppingCart />

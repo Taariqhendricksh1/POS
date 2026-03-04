@@ -18,6 +18,12 @@ public class Order
     [BsonElement("clientName")]
     public string ClientName { get; set; } = string.Empty;
 
+    [BsonElement("customerId")]
+    public string? CustomerId { get; set; }
+
+    [BsonElement("clientPhone")]
+    public string? ClientPhone { get; set; }
+
     [BsonElement("items")]
     public List<OrderItem> Items { get; set; } = new();
 

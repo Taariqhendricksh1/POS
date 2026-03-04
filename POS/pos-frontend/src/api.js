@@ -27,7 +27,8 @@ export const productApi = {
 
 // Orders API
 export const orderApi = {
-  create: (clientEmail, clientName) => api.post('/orders', { clientEmail, clientName }),
+  create: (clientEmail, clientName, customerId, clientPhone) =>
+    api.post('/orders', { clientEmail, clientName, customerId, clientPhone }),
   getById: (id) => api.get(`/orders/${id}`),
   getByInvoice: (invoiceNumber) => api.get(`/orders/invoice/${invoiceNumber}`),
   getRecent: (limit = 50) => api.get(`/orders/recent?limit=${limit}`),
@@ -39,6 +40,18 @@ export const orderApi = {
     api.post(`/orders/${orderId}/complete`, { paymentMethod }),
   cancel: (orderId) => api.post(`/orders/${orderId}/cancel`),
   delete: (orderId) => api.delete(`/orders/${orderId}`),
+};
+
+// Customers API
+export const customerApi = {
+  getAll: () => api.get('/customers'),
+  getById: (id) => api.get(`/customers/${id}`),
+  getByEmail: (email) => api.get(`/customers/email/${email}`),
+  search: (query) => api.get(`/customers/search/${query}`),
+  create: (customer) => api.post('/customers', customer),
+  update: (id, customer) => api.put(`/customers/${id}`, customer),
+  deactivate: (id) => api.patch(`/customers/${id}/deactivate`),
+  delete: (id) => api.delete(`/customers/${id}`),
 };
 
 export default api;

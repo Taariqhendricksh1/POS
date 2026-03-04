@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   ScanLine,
   Plus,
@@ -12,8 +12,15 @@ import {
   X,
   Send,
   AlertCircle,
+  Search,
+  User,
+  UserPlus,
+  Users,
+  Phone,
+  Mail,
+  MapPin,
 } from 'lucide-react';
-import { orderApi } from '../api';
+import { orderApi, customerApi } from '../api';
 import { useToast } from '../hooks/useToast';
 import BarcodeScanner from '../components/BarcodeScanner';
 
@@ -24,10 +31,30 @@ const STEPS = {
   SUCCESS: 'success',
 };
 
+const CLIENT_MODES = {
+  EXISTING: 'existing',
+  NEW: 'new',
+  GUEST: 'guest',
+};
+
 export default function NewSale() {
   const [step, setStep] = useState(STEPS.CLIENT);
+  const [clientMode, setClientMode] = useState(CLIENT_MODES.EXISTING);
   const [clientEmail, setClientEmail] = useState('');
   const [clientName, setClientName] = useState('');
+  const [clientPhone, setClientPhone] = useState('');
+  const [selectedCustomerId, setSelectedCustomerId] = useState(null);
+  // Customer search
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const searchTimer = useRef(null);
+  // New customer inline
+  const [newCustFirstName, setNewCustFirstName] = useState('');
+  const [newCustLastName, setNewCustLastName] = useState('');
+  const [newCustEmail, setNewCustEmail] = useState('');
+  const [newCustPhone, setNewCustPhone] = useState('');
+
   const [order, setOrder] = useState(null);
   const [showScanner, setShowScanner] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
@@ -36,12 +63,73 @@ export default function NewSale() {
   const [errorMsg, setErrorMsg] = useState('');
   const { showToast } = useToast();
 
+  // Debounced customer search
+  useEffect(() => {
+    if (clientMode !== CLIENT_MODES.EXISTING || customerSearch.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const res = await customerApi.search(customerSearch.trim());
+        setSearchResults(res.data);
+      } catch {
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(searchTimer.current);
+  }, [customerSearch, clientMode]);
+
+  const selectCustomer = (customer) => {
+    setSelectedCustomerId(customer.id);
+    setClientName(`${customer.firstName} ${customer.lastName}`);
+    setClientEmail(customer.email || '');
+    setClientPhone(customer.cellNumber || '');
+    setCustomerSearch('');
+    setSearchResults([]);
+  };
+
   const handleStartSale = async (e) => {
     e.preventDefault();
     setStarting(true);
     setErrorMsg('');
+
+    let customerId = null;
+    let email = clientEmail;
+    let name = clientName;
+    let phone = clientPhone;
+
+    // If creating a new customer inline, save them first
+    if (clientMode === CLIENT_MODES.NEW) {
+      try {
+        const payload = {
+          firstName: newCustFirstName,
+          lastName: newCustLastName,
+          email: newCustEmail,
+          cellNumber: newCustPhone,
+          deliveryAddress: { street: '', city: '', province: '', postalCode: '' },
+        };
+        const custRes = await customerApi.create(payload);
+        customerId = custRes.data.id;
+        email = newCustEmail;
+        name = `${newCustFirstName} ${newCustLastName}`;
+        phone = newCustPhone;
+      } catch (err) {
+        const msg = err.response?.data?.message || 'Failed to create customer';
+        setErrorMsg(msg);
+        setStarting(false);
+        return;
+      }
+    } else if (clientMode === CLIENT_MODES.EXISTING) {
+      customerId = selectedCustomerId;
+    }
+
     try {
-      const res = await orderApi.create(clientEmail, clientName);
+      const res = await orderApi.create(email, name, customerId, phone);
       setOrder(res.data);
       setShowScanner(true);
       setStep(STEPS.SCAN);
@@ -120,9 +208,26 @@ export default function NewSale() {
     setStep(STEPS.CLIENT);
     setClientEmail('');
     setClientName('');
+    setClientPhone('');
+    setSelectedCustomerId(null);
+    setCustomerSearch('');
+    setSearchResults([]);
+    setNewCustFirstName('');
+    setNewCustLastName('');
+    setNewCustEmail('');
+    setNewCustPhone('');
+    setClientMode(CLIENT_MODES.EXISTING);
     setOrder(null);
     setPaymentMethod('Cash');
   };
+
+  // Helper: is start-sale enabled?
+  const canStart =
+    clientMode === CLIENT_MODES.EXISTING
+      ? selectedCustomerId && clientName
+      : clientMode === CLIENT_MODES.NEW
+        ? newCustFirstName && newCustLastName
+        : clientName; // guest just needs a name
 
   // Step 1: Client Details
   if (step === STEPS.CLIENT) {
@@ -130,36 +235,129 @@ export default function NewSale() {
       <div>
         <div className="page-header">
           <h1>New Sale</h1>
-          <p>Enter client details to begin</p>
+          <p>Select or create a customer</p>
+        </div>
+
+        {/* Mode Tabs */}
+        <div className="payment-toggle" style={{ marginBottom: 16 }}>
+          <button
+            className={clientMode === CLIENT_MODES.EXISTING ? 'active' : ''}
+            onClick={() => setClientMode(CLIENT_MODES.EXISTING)}
+          >
+            <Users size={18} />
+            Existing
+          </button>
+          <button
+            className={clientMode === CLIENT_MODES.NEW ? 'active' : ''}
+            onClick={() => setClientMode(CLIENT_MODES.NEW)}
+          >
+            <UserPlus size={18} />
+            New
+          </button>
+          <button
+            className={clientMode === CLIENT_MODES.GUEST ? 'active' : ''}
+            onClick={() => setClientMode(CLIENT_MODES.GUEST)}
+          >
+            <User size={18} />
+            Guest
+          </button>
         </div>
 
         <div className="card" style={{ padding: 24 }}>
-          <div style={{ textAlign: 'center', marginBottom: 20 }}>
-            <ShoppingCart size={40} color="var(--accent)" />
-          </div>
-
           <form onSubmit={handleStartSale}>
-            <div className="input-group">
-              <label>Client Name *</label>
-              <input
-                type="text"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                placeholder="John Doe"
-                required
-              />
-            </div>
+            {/* ---- EXISTING CUSTOMER ---- */}
+            {clientMode === CLIENT_MODES.EXISTING && (
+              <>
+                <div className="input-group">
+                  <label>Search Customer</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={customerSearch}
+                      onChange={(e) => { setCustomerSearch(e.target.value); setSelectedCustomerId(null); }}
+                      placeholder="Type name, email or phone..."
+                    />
+                    {searching && (
+                      <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)' }}>
+                        <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                      </div>
+                    )}
+                  </div>
 
-            <div className="input-group">
-              <label>Client Email *</label>
-              <input
-                type="email"
-                value={clientEmail}
-                onChange={(e) => setClientEmail(e.target.value)}
-                placeholder="client@email.com"
-                required
-              />
-            </div>
+                  {/* Search results dropdown */}
+                  {searchResults.length > 0 && (
+                    <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', maxHeight: 200, overflowY: 'auto', marginTop: 4 }}>
+                      {searchResults.map((c) => (
+                        <div
+                          key={c.id}
+                          onClick={() => selectCustomer(c)}
+                          style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 2 }}
+                        >
+                          <span style={{ fontWeight: 600, fontSize: 14 }}>{c.firstName} {c.lastName}</span>
+                          <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                            {c.email}{c.cellNumber ? ` • ${c.cellNumber}` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected customer summary */}
+                {selectedCustomerId && (
+                  <div style={{ background: 'var(--success-bg, #dcfce7)', borderRadius: 'var(--radius-sm)', padding: 12, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <User size={20} color="var(--success, #16a34a)" />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{clientName}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {clientEmail}{clientPhone ? ` • ${clientPhone}` : ''}
+                      </div>
+                    </div>
+                    <button type="button" onClick={() => { setSelectedCustomerId(null); setClientName(''); setClientEmail(''); setClientPhone(''); }} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ---- NEW CUSTOMER ---- */}
+            {clientMode === CLIENT_MODES.NEW && (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div className="input-group">
+                    <label>First Name *</label>
+                    <input type="text" value={newCustFirstName} onChange={(e) => setNewCustFirstName(e.target.value)} placeholder="John" required />
+                  </div>
+                  <div className="input-group">
+                    <label>Last Name *</label>
+                    <input type="text" value={newCustLastName} onChange={(e) => setNewCustLastName(e.target.value)} placeholder="Doe" required />
+                  </div>
+                </div>
+                <div className="input-group">
+                  <label>Email</label>
+                  <input type="email" value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="john@example.com" />
+                </div>
+                <div className="input-group">
+                  <label>Cell Number</label>
+                  <input type="tel" value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="+27 82 123 4567" />
+                </div>
+              </>
+            )}
+
+            {/* ---- GUEST SALE ---- */}
+            {clientMode === CLIENT_MODES.GUEST && (
+              <>
+                <div className="input-group">
+                  <label>Name *</label>
+                  <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Walk-in Customer" required />
+                </div>
+                <div className="input-group">
+                  <label>Email</label>
+                  <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="Optional for invoice" />
+                </div>
+              </>
+            )}
 
             {errorMsg && (
               <div style={{ background: '#fee2e2', color: '#991b1b', padding: 12, borderRadius: 8, marginBottom: 12, fontSize: 13, fontWeight: 500 }}>
@@ -167,7 +365,7 @@ export default function NewSale() {
               </div>
             )}
 
-            <button type="submit" className="btn btn-primary" disabled={starting}>
+            <button type="submit" className="btn btn-primary" disabled={starting || !canStart}>
               {starting ? (
                 <><span className="spinner" /> Connecting...</>
               ) : (

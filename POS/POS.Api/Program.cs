@@ -16,6 +16,7 @@ builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("App"))
 builder.Services.AddSingleton<ProductService>();
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddSingleton<OrderService>();
+builder.Services.AddSingleton<CustomerService>();
 
 // Controllers + JSON
 builder.Services.AddControllers()

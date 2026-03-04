@@ -18,7 +18,8 @@ public class OrdersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Order>> CreateOrder([FromBody] CreateOrderRequest request)
     {
-        var order = await _orderService.CreateOrderAsync(request.ClientEmail, request.ClientName);
+        var order = await _orderService.CreateOrderAsync(
+            request.ClientEmail, request.ClientName, request.CustomerId, request.ClientPhone);
         return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
     }
 
@@ -100,6 +101,8 @@ public class CreateOrderRequest
 {
     public string ClientEmail { get; set; } = string.Empty;
     public string ClientName { get; set; } = string.Empty;
+    public string? CustomerId { get; set; }
+    public string? ClientPhone { get; set; }
 }
 
 public class AddItemRequest
