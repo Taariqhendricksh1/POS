@@ -38,6 +38,7 @@ export const orderApi = {
   removeItem: (orderId, productId) => api.delete(`/orders/${orderId}/items/${productId}`),
   complete: (orderId, paymentMethod) =>
     api.post(`/orders/${orderId}/complete`, { paymentMethod }),
+  resendEmail: (orderId) => api.post(`/orders/${orderId}/resend-email`),
   cancel: (orderId) => api.post(`/orders/${orderId}/cancel`),
   delete: (orderId) => api.delete(`/orders/${orderId}`),
 };

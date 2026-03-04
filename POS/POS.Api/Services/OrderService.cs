@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using POS.Api.Configuration;
@@ -12,12 +13,14 @@ public class OrderService
     private readonly ProductService _productService;
     private readonly EmailService _emailService;
     private readonly AppSettings _appSettings;
+    private readonly ILogger<OrderService> _logger;
 
     public OrderService(
         IOptions<MongoDbSettings> dbSettings,
         IOptions<AppSettings> appSettings,
         ProductService productService,
-        EmailService emailService)
+        EmailService emailService,
+        ILogger<OrderService> logger)
     {
         var client = new MongoClient(dbSettings.Value.ConnectionString);
         var database = client.GetDatabase(dbSettings.Value.DatabaseName);
@@ -26,6 +29,7 @@ public class OrderService
         _productService = productService;
         _emailService = emailService;
         _appSettings = appSettings.Value;
+        _logger = logger;
     }
 
     public async Task<string> GenerateInvoiceNumberAsync()
@@ -150,16 +154,25 @@ public class OrderService
 
         await _orders.ReplaceOneAsync(o => o.Id == orderId, order);
 
-        // Send invoice email (fire and forget)
+        // Send invoice email (fire and forget, track result)
         _ = Task.Run(async () =>
         {
             try
             {
                 await _emailService.SendInvoiceEmailAsync(order);
+                var emailUpdate = Builders<Order>.Update
+                    .Set(o => o.EmailSent, true)
+                    .Set(o => o.EmailError, null);
+                await _orders.UpdateOneAsync(o => o.Id == orderId, emailUpdate);
+                _logger.LogInformation("Invoice email sent for {InvoiceNumber}", order.InvoiceNumber);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to send invoice email: {ex.Message}");
+                _logger.LogError(ex, "Failed to send invoice email for {InvoiceNumber}: {Error}", order.InvoiceNumber, ex.Message);
+                var emailUpdate = Builders<Order>.Update
+                    .Set(o => o.EmailSent, false)
+                    .Set(o => o.EmailError, ex.Message);
+                await _orders.UpdateOneAsync(o => o.Id == orderId, emailUpdate);
             }
         });
 
@@ -174,6 +187,32 @@ public class OrderService
         order.Status = OrderStatus.Cancelled;
         await _orders.ReplaceOneAsync(o => o.Id == orderId, order);
         return order;
+    }
+
+    public async Task<bool?> ResendInvoiceEmailAsync(string orderId)
+    {
+        var order = await _orders.Find(o => o.Id == orderId).FirstOrDefaultAsync();
+        if (order == null || order.Status != OrderStatus.Completed) return null;
+
+        try
+        {
+            await _emailService.SendInvoiceEmailAsync(order);
+            var update = Builders<Order>.Update
+                .Set(o => o.EmailSent, true)
+                .Set(o => o.EmailError, null);
+            await _orders.UpdateOneAsync(o => o.Id == orderId, update);
+            _logger.LogInformation("Invoice email resent for {InvoiceNumber}", order.InvoiceNumber);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to resend invoice email for {InvoiceNumber}: {Error}", order.InvoiceNumber, ex.Message);
+            var update = Builders<Order>.Update
+                .Set(o => o.EmailSent, false)
+                .Set(o => o.EmailError, ex.Message);
+            await _orders.UpdateOneAsync(o => o.Id == orderId, update);
+            return false;
+        }
     }
 
     public async Task<bool> DeleteOrderAsync(string orderId)

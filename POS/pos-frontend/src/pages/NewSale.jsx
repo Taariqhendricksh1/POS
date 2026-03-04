@@ -20,7 +20,7 @@ import {
   Mail,
   MapPin,
 } from 'lucide-react';
-import { orderApi, customerApi } from '../api';
+import { orderApi, customerApi, productApi } from '../api';
 import { useToast } from '../hooks/useToast';
 import BarcodeScanner from '../components/BarcodeScanner';
 
@@ -61,6 +61,14 @@ export default function NewSale() {
   const [processing, setProcessing] = useState(false);
   const [starting, setStarting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  // Product search
+  const [productSearch, setProductSearch] = useState('');
+  const [productResults, setProductResults] = useState([]);
+  const [searchingProducts, setSearchingProducts] = useState(false);
+  const productSearchTimer = useRef(null);
+  // Email status
+  const [emailStatus, setEmailStatus] = useState(null); // null=pending, true=sent, false=failed
+  const [resending, setResending] = useState(false);
   const { showToast } = useToast();
 
   // Debounced customer search
@@ -83,6 +91,41 @@ export default function NewSale() {
     }, 300);
     return () => clearTimeout(searchTimer.current);
   }, [customerSearch, clientMode]);
+
+  // Debounced product search
+  useEffect(() => {
+    if (productSearch.trim().length < 2) {
+      setProductResults([]);
+      return;
+    }
+    clearTimeout(productSearchTimer.current);
+    productSearchTimer.current = setTimeout(async () => {
+      setSearchingProducts(true);
+      try {
+        const res = await productApi.search(productSearch.trim());
+        setProductResults(res.data);
+      } catch {
+        setProductResults([]);
+      } finally {
+        setSearchingProducts(false);
+      }
+    }, 300);
+    return () => clearTimeout(productSearchTimer.current);
+  }, [productSearch]);
+
+  const handleAddProductByBarcode = async (barcode) => {
+    if (!order) return;
+    try {
+      const res = await orderApi.addItem(order.id, barcode);
+      setOrder(res.data);
+      setProductSearch('');
+      setProductResults([]);
+      showToast('Item added!', 'success');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Product not found or out of stock';
+      showToast(msg, 'error');
+    }
+  };
 
   const selectCustomer = (customer) => {
     setSelectedCustomerId(customer.id);
@@ -133,6 +176,7 @@ export default function NewSale() {
       setOrder(res.data);
       setShowScanner(true);
       setStep(STEPS.SCAN);
+      setEmailStatus(null);
       showToast(`Invoice ${res.data.invoiceNumber} created`, 'success');
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Failed to create order';
@@ -183,7 +227,10 @@ export default function NewSale() {
       const res = await orderApi.complete(order.id, paymentMethod);
       setOrder(res.data);
       setStep(STEPS.SUCCESS);
+      setEmailStatus(null); // Will poll for status
       showToast('Sale completed! Invoice sent.', 'success');
+      // Poll for email status
+      pollEmailStatus(res.data.id);
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to complete order';
       showToast(msg, 'error');
@@ -219,6 +266,37 @@ export default function NewSale() {
     setClientMode(CLIENT_MODES.EXISTING);
     setOrder(null);
     setPaymentMethod('Cash');
+    setProductSearch('');
+    setProductResults([]);
+    setEmailStatus(null);
+  };
+
+  const pollEmailStatus = async (orderId) => {
+    // Check email status after a few seconds
+    for (let i = 0; i < 6; i++) {
+      await new Promise(r => setTimeout(r, 3000));
+      try {
+        const res = await orderApi.getById(orderId);
+        if (res.data.emailSent === true) { setEmailStatus(true); return; }
+        if (res.data.emailSent === false) { setEmailStatus(false); return; }
+      } catch { /* keep polling */ }
+    }
+    setEmailStatus(false); // Assume failed after 18s
+  };
+
+  const handleResendEmail = async () => {
+    if (!order) return;
+    setResending(true);
+    try {
+      await orderApi.resendEmail(order.id);
+      setEmailStatus(true);
+      showToast('Invoice email sent!', 'success');
+    } catch (err) {
+      showToast('Failed to send email', 'error');
+      setEmailStatus(false);
+    } finally {
+      setResending(false);
+    }
   };
 
   // Helper: is start-sale enabled?
@@ -400,13 +478,15 @@ export default function NewSale() {
         </div>
 
         {/* Scan Button */}
-        <button
-          className="btn btn-primary"
-          onClick={() => setShowScanner(!showScanner)}
-          style={{ marginBottom: 16 }}
-        >
-          <ScanLine size={18} /> {showScanner ? 'Hide Scanner' : 'Scan Product'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => setShowScanner(!showScanner)}
+            style={{ flex: 1 }}
+          >
+            <ScanLine size={18} /> {showScanner ? 'Hide Scanner' : 'Scan Product'}
+          </button>
+        </div>
 
         {/* Scanner */}
         {showScanner && (
@@ -414,6 +494,41 @@ export default function NewSale() {
             <BarcodeScanner onScan={handleScanProduct} continuous />
           </div>
         )}
+
+        {/* Product Search */}
+        <div style={{ marginBottom: 16 }}>
+          <div className="search-bar">
+            <Search />
+            <input
+              type="text"
+              placeholder="Search product by name..."
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+            />
+            {searchingProducts && (
+              <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2, position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            )}
+          </div>
+          {productResults.length > 0 && (
+            <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', maxHeight: 200, overflowY: 'auto', background: 'var(--card-bg, white)' }}>
+              {productResults.map((p) => (
+                <div
+                  key={p.id}
+                  onClick={() => handleAddProductByBarcode(p.barcode)}
+                  style={{ padding: '10px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                      {p.barcode} • Stock: {p.stockQuantity}
+                    </div>
+                  </div>
+                  <div style={{ fontWeight: 600, color: 'var(--primary)' }}>R{p.sellingPrice.toFixed(2)}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Order Items */}
         {order?.items?.length > 0 ? (
@@ -588,9 +703,33 @@ export default function NewSale() {
             <CheckCircle2 />
           </div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>Sale Complete!</h2>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
-            Invoice {order?.invoiceNumber} has been sent to {clientEmail}
-          </p>
+
+          {/* Email status */}
+          {emailStatus === null && (
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Sending invoice to {clientEmail}...
+            </p>
+          )}
+          {emailStatus === true && (
+            <p style={{ color: 'var(--success, #16a34a)', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Send size={14} /> Invoice sent to {clientEmail}
+            </p>
+          )}
+          {emailStatus === false && (
+            <div style={{ marginBottom: 20, textAlign: 'center' }}>
+              <p style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
+                <AlertCircle size={14} /> Failed to send invoice to {clientEmail}
+              </p>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={handleResendEmail}
+                disabled={resending}
+                style={{ width: 'auto', display: 'inline-flex' }}
+              >
+                {resending ? <><span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Sending...</> : <><Send size={14} /> Resend Invoice</>}
+              </button>
+            </div>
+          )}
 
           <div className="card" style={{ textAlign: 'left', marginBottom: 20 }}>
             <div className="summary-row">

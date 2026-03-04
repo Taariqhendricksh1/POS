@@ -56,6 +56,12 @@ public class Order
 
     [BsonElement("completedAt")]
     public DateTime? CompletedAt { get; set; }
+
+    [BsonElement("emailSent")]
+    public bool? EmailSent { get; set; }
+
+    [BsonElement("emailError")]
+    public string? EmailError { get; set; }
 }
 
 public class OrderItem

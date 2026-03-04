@@ -80,6 +80,15 @@ public class OrdersController : ControllerBase
         return Ok(order);
     }
 
+    [HttpPost("{id}/resend-email")]
+    public async Task<ActionResult> ResendEmail(string id)
+    {
+        var result = await _orderService.ResendInvoiceEmailAsync(id);
+        if (result == null) return NotFound();
+        if (result == false) return BadRequest(new { message = "Failed to send email. Check server logs." });
+        return Ok(new { message = "Invoice email sent successfully" });
+    }
+
     [HttpPost("{id}/cancel")]
     public async Task<ActionResult<Order>> CancelOrder(string id)
     {

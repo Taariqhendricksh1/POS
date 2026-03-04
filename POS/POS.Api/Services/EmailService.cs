@@ -1,5 +1,6 @@
 using System.Text;
 using MailKit.Net.Smtp;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
 using POS.Api.Configuration;
@@ -11,15 +12,19 @@ public class EmailService
 {
     private readonly EmailSettings _emailSettings;
     private readonly AppSettings _appSettings;
+    private readonly ILogger<EmailService> _logger;
 
-    public EmailService(IOptions<EmailSettings> emailSettings, IOptions<AppSettings> appSettings)
+    public EmailService(IOptions<EmailSettings> emailSettings, IOptions<AppSettings> appSettings, ILogger<EmailService> logger)
     {
         _emailSettings = emailSettings.Value;
         _appSettings = appSettings.Value;
+        _logger = logger;
     }
 
     public async Task SendInvoiceEmailAsync(Order order)
     {
+        _logger.LogInformation("Sending invoice email for {InvoiceNumber} to {Email}", order.InvoiceNumber, order.ClientEmail);
+
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(_appSettings.CompanyName, _emailSettings.SenderEmail));
         message.To.Add(new MailboxAddress(order.ClientName, order.ClientEmail));
@@ -36,15 +41,18 @@ public class EmailService
         message.Body = bodyBuilder.ToMessageBody();
 
         using var client = new SmtpClient();
+        _logger.LogInformation("Connecting to SMTP {Server}:{Port} (SSL={Ssl})", _emailSettings.SmtpServer, _emailSettings.SmtpPort, _emailSettings.UseSsl);
         await client.ConnectAsync(_emailSettings.SmtpServer, _emailSettings.SmtpPort, _emailSettings.UseSsl);
 
         if (!string.IsNullOrEmpty(_emailSettings.Password))
         {
+            _logger.LogInformation("Authenticating as {SenderEmail}", _emailSettings.SenderEmail);
             await client.AuthenticateAsync(_emailSettings.SenderEmail, _emailSettings.Password);
         }
 
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
+        _logger.LogInformation("Invoice email sent successfully for {InvoiceNumber}", order.InvoiceNumber);
     }
 
     private string GenerateInvoiceHtml(Order order)
