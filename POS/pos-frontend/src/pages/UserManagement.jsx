@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Trash2, Shield, ShieldOff, Users, Mail, Lock, User, Eye, EyeOff, X, Key } from 'lucide-react';
+import { UserPlus, Trash2, Shield, ShieldOff, Users, Mail, Lock, User, Eye, EyeOff, X } from 'lucide-react';
 import { authApi } from '../api';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -8,17 +8,12 @@ export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newName, setNewName] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState('User');
   const [showNewPw, setShowNewPw] = useState(false);
   const [adding, setAdding] = useState(false);
-  // Change password
-  const [currentPw, setCurrentPw] = useState('');
-  const [changePw, setChangePw] = useState('');
-  const [confirmPw, setConfirmPw] = useState('');
-  const [changingPw, setChangingPw] = useState(false);
   const { user: currentUser, isAdmin } = useAuth();
   const { showToast } = useToast();
 
@@ -41,12 +36,13 @@ export default function UserManagement() {
     e.preventDefault();
     setAdding(true);
     try {
-      await authApi.createUser(newEmail, newName, newPassword, 'User');
+      await authApi.createUser(newEmail, newName, newPassword, newRole);
       showToast('User created', 'success');
       setShowAdd(false);
       setNewEmail('');
       setNewName('');
       setNewPassword('');
+      setNewRole('User');
       loadUsers();
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to create user';
@@ -78,32 +74,6 @@ export default function UserManagement() {
     }
   };
 
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    if (changePw !== confirmPw) {
-      showToast('Passwords do not match', 'error');
-      return;
-    }
-    if (changePw.length < 6) {
-      showToast('Password must be at least 6 characters', 'error');
-      return;
-    }
-    setChangingPw(true);
-    try {
-      await authApi.changePassword(currentPw, changePw);
-      showToast('Password changed successfully', 'success');
-      setShowChangePassword(false);
-      setCurrentPw('');
-      setChangePw('');
-      setConfirmPw('');
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to change password';
-      showToast(msg, 'error');
-    } finally {
-      setChangingPw(false);
-    }
-  };
-
   const formatDate = (dateStr) => {
     if (!dateStr) return 'Never';
     return new Date(dateStr).toLocaleDateString('en-ZA', {
@@ -131,12 +101,9 @@ export default function UserManagement() {
       </div>
 
       {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-        <button className="btn btn-primary" onClick={() => setShowAdd(true)} style={{ flex: 1 }}>
+      <div style={{ marginBottom: 16 }}>
+        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
           <UserPlus size={18} /> Add User
-        </button>
-        <button className="btn btn-outline" onClick={() => setShowChangePassword(true)} style={{ flex: 1 }}>
-          <Key size={18} /> Change My Password
         </button>
       </div>
 
@@ -172,35 +139,15 @@ export default function UserManagement() {
                 </button>
               </div>
             </div>
+            <div className="input-group">
+              <label><Shield size={14} style={{ verticalAlign: -2, marginRight: 4 }} /> Role</label>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button type="button" className={`btn btn-sm ${newRole === 'User' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setNewRole('User')} style={{ flex: 1 }}>User</button>
+                <button type="button" className={`btn btn-sm ${newRole === 'Admin' ? 'btn-primary' : 'btn-outline'}`} onClick={() => setNewRole('Admin')} style={{ flex: 1 }}>Admin</button>
+              </div>
+            </div>
             <button type="submit" className="btn btn-success" disabled={adding}>
               {adding ? <><span className="spinner" /> Creating...</> : <><UserPlus size={16} /> Create User</>}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* Change Password Form */}
-      {showChangePassword && (
-        <div className="card" style={{ padding: 20, marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h3 style={{ fontSize: 16 }}>Change My Password</h3>
-            <button className="modal-close" onClick={() => setShowChangePassword(false)}><X size={16} /></button>
-          </div>
-          <form onSubmit={handleChangePassword}>
-            <div className="input-group">
-              <label>Current Password</label>
-              <input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} required />
-            </div>
-            <div className="input-group">
-              <label>New Password</label>
-              <input type="password" value={changePw} onChange={(e) => setChangePw(e.target.value)} placeholder="Min 6 characters" required minLength={6} />
-            </div>
-            <div className="input-group">
-              <label>Confirm New Password</label>
-              <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} required />
-            </div>
-            <button type="submit" className="btn btn-primary" disabled={changingPw}>
-              {changingPw ? <><span className="spinner" /> Updating...</> : <><Lock size={16} /> Update Password</>}
             </button>
           </form>
         </div>
