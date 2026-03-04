@@ -1,5 +1,6 @@
 using System.Text;
 using MailKit.Net.Smtp;
+using MailKit.Security;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MimeKit;
@@ -41,8 +42,12 @@ public class EmailService
         message.Body = bodyBuilder.ToMessageBody();
 
         using var client = new SmtpClient();
-        _logger.LogInformation("Connecting to SMTP {Server}:{Port} (SSL={Ssl})", _emailSettings.SmtpServer, _emailSettings.SmtpPort, _emailSettings.UseSsl);
-        await client.ConnectAsync(_emailSettings.SmtpServer, _emailSettings.SmtpPort, _emailSettings.UseSsl);
+        // Port 587 = STARTTLS, Port 465 = implicit SSL
+        var socketOptions = _emailSettings.SmtpPort == 465
+            ? SecureSocketOptions.SslOnConnect
+            : SecureSocketOptions.StartTls;
+        _logger.LogInformation("Connecting to SMTP {Server}:{Port} ({SocketOptions})", _emailSettings.SmtpServer, _emailSettings.SmtpPort, socketOptions);
+        await client.ConnectAsync(_emailSettings.SmtpServer, _emailSettings.SmtpPort, socketOptions);
 
         if (!string.IsNullOrEmpty(_emailSettings.Password))
         {
