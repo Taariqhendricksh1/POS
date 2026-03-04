@@ -7,6 +7,47 @@ const api = axios.create({
   },
 });
 
+// JWT interceptor — attach token to every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('pos_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Response interceptor — redirect to login on 401
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('pos_token');
+      localStorage.removeItem('pos_user');
+      // Only redirect if not already on login
+      if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/reset-password')) {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+// Auth API
+export const authApi = {
+  login: (email, password) => api.post('/auth/login', { email, password }),
+  me: () => api.get('/auth/me'),
+  changePassword: (currentPassword, newPassword) =>
+    api.post('/auth/change-password', { currentPassword, newPassword }),
+  requestReset: (email) => api.post('/auth/request-reset', { email }),
+  resetPassword: (token, newPassword) => api.post('/auth/reset-password', { token, newPassword }),
+  // Admin user management
+  getUsers: () => api.get('/auth/users'),
+  createUser: (email, name, password, role) =>
+    api.post('/auth/users', { email, name, password, role }),
+  deleteUser: (id) => api.delete(`/auth/users/${id}`),
+  toggleUser: (id) => api.patch(`/auth/users/${id}/toggle`),
+};
+
 // Products API
 export const productApi = {
   getAll: (shop) => api.get('/products', { params: shop ? { shop } : {} }),
@@ -32,7 +73,7 @@ export const orderApi = {
   getById: (id) => api.get(`/orders/${id}`),
   getByInvoice: (invoiceNumber) => api.get(`/orders/invoice/${invoiceNumber}`),
   getRecent: (limit = 50) => api.get(`/orders/recent?limit=${limit}`),
-  getSalesSummary: (from, to) => api.get('/orders/sales-summary', { params: { from, to } }),
+  getSalesSummary: (from, to, shop) => api.get('/orders/sales-summary', { params: { from, to, ...(shop ? { shop } : {}) } }),
   addItem: (orderId, barcode) => api.post(`/orders/${orderId}/items`, { barcode }),
   updateItemQty: (orderId, productId, quantity) =>
     api.put(`/orders/${orderId}/items/${productId}`, { quantity }),

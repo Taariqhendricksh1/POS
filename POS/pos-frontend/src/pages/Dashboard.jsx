@@ -46,7 +46,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadSalesSummary();
-  }, []);
+  }, [selectedShop]);
 
   const loadShops = async () => {
     try {
@@ -79,7 +79,8 @@ export default function Dashboard() {
     try {
       const fromParam = (from || dateFrom) + 'T00:00:00Z';
       const toParam = (to || dateTo) + 'T23:59:59Z';
-      const res = await orderApi.getSalesSummary(fromParam, toParam);
+      const shopParam = selectedShop || undefined;
+      const res = await orderApi.getSalesSummary(fromParam, toParam, shopParam);
       setSalesSummary(res.data);
     } catch (err) {
       console.error('Sales summary load error:', err);

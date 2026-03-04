@@ -211,4 +211,56 @@ public class EmailService
 
         return sb.ToString();
     }
+
+    public async Task SendResetEmailAsync(string toEmail, string toName, string subject, string htmlBody, string textBody)
+    {
+        _logger.LogInformation("Sending reset email to {Email}", toEmail);
+
+        if (!string.IsNullOrEmpty(_emailSettings.ApiKey))
+        {
+            var payload = new
+            {
+                sender = new { name = _appSettings.CompanyName, email = _emailSettings.SenderEmail },
+                to = new[] { new { name = toName, email = toEmail } },
+                subject,
+                htmlContent = htmlBody,
+                textContent = textBody
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            var request = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email")
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
+            };
+            request.Headers.Add("api-key", _emailSettings.ApiKey);
+
+            var response = await _httpClient.SendAsync(request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var responseBody = await response.Content.ReadAsStringAsync();
+                throw new Exception($"Brevo API error {response.StatusCode}: {responseBody}");
+            }
+        }
+        else
+        {
+            var message = new MimeMessage();
+            message.From.Add(new MailboxAddress(_appSettings.CompanyName, _emailSettings.SenderEmail));
+            message.To.Add(new MailboxAddress(toName, toEmail));
+            message.Subject = subject;
+            var bodyBuilder = new BodyBuilder { HtmlBody = htmlBody, TextBody = textBody };
+            message.Body = bodyBuilder.ToMessageBody();
+
+            using var client = new SmtpClient();
+            var socketOptions = _emailSettings.SmtpPort == 465
+                ? SecureSocketOptions.SslOnConnect
+                : SecureSocketOptions.StartTls;
+            await client.ConnectAsync(_emailSettings.SmtpServer, _emailSettings.SmtpPort, socketOptions);
+            if (!string.IsNullOrEmpty(_emailSettings.Password))
+                await client.AuthenticateAsync(_emailSettings.SenderEmail, _emailSettings.Password);
+            await client.SendAsync(message);
+            await client.DisconnectAsync(true);
+        }
+
+        _logger.LogInformation("Reset email sent to {Email}", toEmail);
+    }
 }

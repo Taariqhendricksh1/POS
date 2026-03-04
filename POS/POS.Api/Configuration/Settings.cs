@@ -27,3 +27,11 @@ public class AppSettings
     public string CurrencySymbol { get; set; } = "R";
     public string InvoicePrefix { get; set; } = "INV";
 }
+
+public class JwtSettings
+{
+    public string Secret { get; set; } = string.Empty;
+    public string Issuer { get; set; } = "POS.Api";
+    public string Audience { get; set; } = "POS.Frontend";
+    public int ExpiryHours { get; set; } = 24;
+}

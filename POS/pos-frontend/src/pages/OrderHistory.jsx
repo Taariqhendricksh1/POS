@@ -55,7 +55,7 @@ export default function OrderHistory() {
     setCompleting(true);
     try {
       const res = await orderApi.complete(order.id, paymentMethod);
-      showToast(`${order.invoiceNumber} marked as completed`, 'success');
+      showToast(`${order.invoiceNumber} completed — invoice emailed to ${order.clientEmail}`, 'success');
       setShowCompleteConfirm(null);
       setSelectedOrder(null);
       setPaymentMethod('Cash');

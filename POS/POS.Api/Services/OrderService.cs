@@ -238,13 +238,51 @@ public class OrderService
         await _orders.Find(o => o.CreatedAt >= from && o.CreatedAt <= to)
             .SortByDescending(o => o.CreatedAt).ToListAsync();
 
-    public async Task<SalesSummary> GetSalesSummaryAsync(DateTime from, DateTime to)
+    public async Task<SalesSummary> GetSalesSummaryAsync(DateTime from, DateTime to, string? shop = null)
     {
         var orders = await _orders.Find(o =>
             o.Status == OrderStatus.Completed &&
             o.CompletedAt >= from &&
             o.CompletedAt <= to
         ).ToListAsync();
+
+        // If a specific shop is selected, filter to only orders containing items from that shop
+        // and recalculate totals based on those items only
+        if (!string.IsNullOrEmpty(shop))
+        {
+            var filteredOrders = new List<(Order order, List<OrderItem> items)>();
+            foreach (var order in orders)
+            {
+                var shopItems = order.Items.Where(i => i.Shop.Equals(shop, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (shopItems.Any())
+                    filteredOrders.Add((order, shopItems));
+            }
+
+            var totalSalesShop = filteredOrders.Sum(x => x.items.Sum(i => i.LineTotal));
+            var totalOrdersShop = filteredOrders.Count;
+            var totalItemsShop = filteredOrders.Sum(x => x.items.Sum(i => i.Quantity));
+            var totalDiscountShop = filteredOrders.Sum(x => x.items.Sum(i => i.Quantity * (i.UnitPrice - i.EffectivePrice)));
+            var taxRate = _appSettings.DefaultTaxRate;
+            var totalTaxShop = Math.Round(totalSalesShop * taxRate / (100 + taxRate), 2);
+            var avgShop = totalOrdersShop > 0 ? totalSalesShop / totalOrdersShop : 0;
+
+            var paymentBreakdownShop = filteredOrders
+                .GroupBy(x => x.order.PaymentMethod)
+                .ToDictionary(g => g.Key.ToString(), g => g.Sum(x => x.items.Sum(i => i.LineTotal)));
+
+            return new SalesSummary
+            {
+                From = from,
+                To = to,
+                TotalSales = totalSalesShop,
+                TotalOrders = totalOrdersShop,
+                TotalItems = totalItemsShop,
+                TotalDiscount = totalDiscountShop,
+                TotalTax = totalTaxShop,
+                AverageOrderValue = avgShop,
+                PaymentBreakdown = paymentBreakdownShop
+            };
+        }
 
         var totalSales = orders.Sum(o => o.Total);
         var totalOrders = orders.Count;

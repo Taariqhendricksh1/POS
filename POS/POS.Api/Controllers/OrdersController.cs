@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using POS.Api.Models;
 using POS.Api.Services;
@@ -5,6 +6,7 @@ using POS.Api.Services;
 namespace POS.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/[controller]")]
 public class OrdersController : ControllerBase
 {
@@ -98,11 +100,11 @@ public class OrdersController : ControllerBase
     }
 
     [HttpGet("sales-summary")]
-    public async Task<ActionResult<SalesSummary>> GetSalesSummary([FromQuery] DateTime? from, [FromQuery] DateTime? to)
+    public async Task<ActionResult<SalesSummary>> GetSalesSummary([FromQuery] DateTime? from, [FromQuery] DateTime? to, [FromQuery] string? shop = null)
     {
         var fromDate = from ?? DateTime.UtcNow.Date;
         var toDate = to ?? DateTime.UtcNow.Date.AddDays(1).AddTicks(-1);
-        var summary = await _orderService.GetSalesSummaryAsync(fromDate, toDate);
+        var summary = await _orderService.GetSalesSummaryAsync(fromDate, toDate, shop);
         return Ok(summary);
     }
 
