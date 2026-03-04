@@ -6,9 +6,10 @@ services:
       dockerfile: Dockerfile
     container_name: pos-api
     ports:
-      - "5100:8080"
+      - "5100:10000"
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+      - PORT=10000
       - MongoDb__ConnectionString=mongodb+srv://taariqhendricksh1_db_user:EKI7A7WDCPtVgxYk@clusterpos.zyrhmrz.mongodb.net/?appName=ClusterPos
       - MongoDb__DatabaseName=pos_db
     restart: unless-stopped
@@ -20,9 +21,9 @@ services:
       dockerfile: Dockerfile
     container_name: pos-frontend
     ports:
-      - "8080:8080"
+      - "8080:10000"
     environment:
-      - API_URL=http://api:8080
+      - API_URL=http://api:10000
     depends_on:
       - api
     restart: unless-stopped

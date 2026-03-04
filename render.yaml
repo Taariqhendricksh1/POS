@@ -39,9 +39,9 @@ services:
   - type: web
     name: pos-frontend
     runtime: docker
-    dockerfilePath: ./pos-frontend/Dockerfile
-    dockerContext: ./pos-frontend
+    dockerfilePath: ./POS/pos-frontend/Dockerfile
+    dockerContext: ./POS/pos-frontend
     plan: free
     envVars:
       - key: API_URL
-        value: https://pos-api-u1rh.onrender.com 
+        value: https://pos-api.onrender.com
