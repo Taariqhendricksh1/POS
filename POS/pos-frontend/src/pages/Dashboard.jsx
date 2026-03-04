@@ -142,8 +142,16 @@ export default function Dashboard() {
               className="product-item"
               onClick={() => navigate('/inventory')}
             >
-              <div className="product-icon">
-                <Package size={20} color="var(--text-secondary)" />
+              <div className="product-icon" style={{ overflow: 'hidden', borderRadius: 8, flexShrink: 0 }}>
+                {product.imageUrl ? (
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8 }}
+                  />
+                ) : (
+                  <Package size={20} color="var(--text-secondary)" />
+                )}
               </div>
               <div className="product-info">
                 <div className="product-name">{product.name}</div>
