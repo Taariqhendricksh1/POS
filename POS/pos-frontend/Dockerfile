@@ -1,6 +1,6 @@
 FROM node:20-alpine AS build
 WORKDIR /app
-COPY package*.json ./
+COPY POS/pos-frontend/package*.json ./
 RUN npm ci
 COPY . .
 RUN npm run build
