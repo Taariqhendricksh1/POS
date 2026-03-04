@@ -3,8 +3,8 @@ services:
   - type: web
     name: pos-api
     runtime: docker
-    dockerfilePath: ./POS.Api/Dockerfile
-    dockerContext: ./POS.Api
+    dockerfilePath: ./POS/POS.Api/Dockerfile
+    dockerContext: ./POS/POS.Api
     plan: free
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
