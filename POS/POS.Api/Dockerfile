@@ -4,7 +4,7 @@ EXPOSE 8080
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
-COPY ["POS.Api.csproj", "."]
+COPY ["POS/POS/POS.Api.csproj", "."]
 RUN dotnet restore
 COPY . .
 RUN dotnet publish -c Release -o /app/publish
