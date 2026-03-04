@@ -1,4 +1,6 @@
+using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.Extensions.Logging;
@@ -14,6 +16,7 @@ public class EmailService
     private readonly EmailSettings _emailSettings;
     private readonly AppSettings _appSettings;
     private readonly ILogger<EmailService> _logger;
+    private static readonly HttpClient _httpClient = new();
 
     public EmailService(IOptions<EmailSettings> emailSettings, IOptions<AppSettings> appSettings, ILogger<EmailService> logger)
     {
@@ -26,23 +29,72 @@ public class EmailService
     {
         _logger.LogInformation("Sending invoice email for {InvoiceNumber} to {Email}", order.InvoiceNumber, order.ClientEmail);
 
+        var htmlBody = GenerateInvoiceHtml(order);
+        var textBody = GenerateInvoicePlainText(order);
+        var subject = $"Invoice {order.InvoiceNumber} - {_appSettings.CompanyName}";
+
+        // Use Brevo HTTP API if ApiKey is configured (works on Render free tier)
+        if (!string.IsNullOrEmpty(_emailSettings.ApiKey))
+        {
+            await SendViaBrevoApiAsync(order, subject, htmlBody, textBody);
+        }
+        else
+        {
+            await SendViaSmtpAsync(order, subject, htmlBody, textBody);
+        }
+
+        _logger.LogInformation("Invoice email sent successfully for {InvoiceNumber}", order.InvoiceNumber);
+    }
+
+    private async Task SendViaBrevoApiAsync(Order order, string subject, string htmlBody, string textBody)
+    {
+        _logger.LogInformation("Using Brevo HTTP API to send email");
+
+        var payload = new
+        {
+            sender = new { name = _appSettings.CompanyName, email = _emailSettings.SenderEmail },
+            to = new[] { new { name = order.ClientName, email = order.ClientEmail } },
+            subject,
+            htmlContent = htmlBody,
+            textContent = textBody
+        };
+
+        var json = JsonSerializer.Serialize(payload);
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://api.brevo.com/v3/smtp/email")
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        request.Headers.Add("api-key", _emailSettings.ApiKey);
+
+        var response = await _httpClient.SendAsync(request);
+        var responseBody = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            _logger.LogError("Brevo API error {StatusCode}: {Body}", response.StatusCode, responseBody);
+            throw new Exception($"Brevo API error {response.StatusCode}: {responseBody}");
+        }
+
+        _logger.LogInformation("Brevo API response: {Body}", responseBody);
+    }
+
+    private async Task SendViaSmtpAsync(Order order, string subject, string htmlBody, string textBody)
+    {
+        _logger.LogInformation("Using SMTP to send email");
+
         var message = new MimeMessage();
         message.From.Add(new MailboxAddress(_appSettings.CompanyName, _emailSettings.SenderEmail));
         message.To.Add(new MailboxAddress(order.ClientName, order.ClientEmail));
-        message.Subject = $"Invoice {order.InvoiceNumber} - {_appSettings.CompanyName}";
-
-        var htmlBody = GenerateInvoiceHtml(order);
+        message.Subject = subject;
 
         var bodyBuilder = new BodyBuilder
         {
             HtmlBody = htmlBody,
-            TextBody = GenerateInvoicePlainText(order)
+            TextBody = textBody
         };
-
         message.Body = bodyBuilder.ToMessageBody();
 
         using var client = new SmtpClient();
-        // Port 587 = STARTTLS, Port 465 = implicit SSL
         var socketOptions = _emailSettings.SmtpPort == 465
             ? SecureSocketOptions.SslOnConnect
             : SecureSocketOptions.StartTls;
@@ -57,7 +109,6 @@ public class EmailService
 
         await client.SendAsync(message);
         await client.DisconnectAsync(true);
-        _logger.LogInformation("Invoice email sent successfully for {InvoiceNumber}", order.InvoiceNumber);
     }
 
     private string GenerateInvoiceHtml(Order order)

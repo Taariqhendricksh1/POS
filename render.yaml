@@ -23,6 +23,8 @@ services:
         value: POS Store
       - key: Email__Password
         sync: false
+      - key: Email__ApiKey
+        sync: false # Brevo API key (preferred over SMTP on Render)
       - key: Email__UseSsl
         value: "true"
       - key: App__CompanyName

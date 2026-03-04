@@ -14,6 +14,7 @@ public class EmailSettings
     public string SenderName { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public bool UseSsl { get; set; } = true;
+    public string ApiKey { get; set; } = string.Empty; // Brevo HTTP API key (preferred over SMTP on Render)
 }
 
 public class AppSettings
