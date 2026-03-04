@@ -1,5 +1,6 @@
+import { useState, useRef, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Package, BarChart3, History, Users, LogOut, Shield } from 'lucide-react';
+import { ShoppingCart, Package, BarChart3, History, Users, LogOut, Shield, UserCircle } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import NewSale from './pages/NewSale';
@@ -28,17 +29,61 @@ function ProtectedRoute({ children }) {
 function AppLayout() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
 
   const handleLogout = () => {
+    setMenuOpen(false);
     logout();
     navigate('/login', { replace: true });
   };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    if (menuOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [menuOpen]);
 
   if (!user) return null;
 
   return (
     <>
-      <div className="container">
+      {/* Top header with profile menu */}
+      <div className="top-header">
+        <div className="top-header-inner">
+          <span className="top-header-title">POS</span>
+          <div className="profile-menu" ref={menuRef}>
+            <button className="profile-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Profile menu">
+              <UserCircle size={28} />
+            </button>
+            {menuOpen && (
+              <div className="profile-dropdown">
+                <div className="profile-dropdown-user">
+                  <span>{user.email}</span>
+                  {isAdmin && <span className="badge badge-info" style={{ marginLeft: 8, fontSize: 10 }}>Admin</span>}
+                </div>
+                {isAdmin && (
+                  <a className="profile-dropdown-item" onClick={() => { setMenuOpen(false); navigate('/users'); }}>
+                    <Shield size={16} />
+                    <span>Users</span>
+                  </a>
+                )}
+                <a className="profile-dropdown-item danger" onClick={handleLogout}>
+                  <LogOut size={16} />
+                  <span>Logout</span>
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="container" style={{ paddingTop: 56 }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/inventory" element={<Inventory />} />
@@ -58,10 +103,6 @@ function AppLayout() {
           <Package />
           <span>Inventory</span>
         </NavLink>
-        <NavLink to="/customers">
-          <Users />
-          <span>Customers</span>
-        </NavLink>
         <NavLink to="/sale">
           <ShoppingCart />
           <span>New Sale</span>
@@ -70,16 +111,10 @@ function AppLayout() {
           <History />
           <span>Orders</span>
         </NavLink>
-        {isAdmin && (
-          <NavLink to="/users">
-            <Shield />
-            <span>Users</span>
-          </NavLink>
-        )}
-        <a onClick={handleLogout} style={{ cursor: 'pointer' }}>
-          <LogOut />
-          <span>Logout</span>
-        </a>
+        <NavLink to="/customers">
+          <Users />
+          <span>Customers</span>
+        </NavLink>
       </nav>
 
       <Toast />
