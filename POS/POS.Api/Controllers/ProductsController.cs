@@ -107,12 +107,28 @@ public class ProductsController : ControllerBase
         return Ok(new { message = "Stock updated successfully" });
     }
 
+    [HttpPatch("{id}/deactivate")]
+    public async Task<ActionResult> Deactivate(string id)
+    {
+        var result = await _productService.DeactivateAsync(id);
+        if (!result) return NotFound();
+        return Ok(new { message = "Product deactivated successfully" });
+    }
+
+    [HttpPatch("{id}/activate")]
+    public async Task<ActionResult> Activate(string id)
+    {
+        var result = await _productService.ActivateAsync(id);
+        if (!result) return NotFound();
+        return Ok(new { message = "Product activated successfully" });
+    }
+
     [HttpDelete("{id}")]
     public async Task<ActionResult> Delete(string id)
     {
-        var deleted = await _productService.DeleteAsync(id);
+        var deleted = await _productService.HardDeleteAsync(id);
         if (!deleted) return NotFound();
-        return Ok(new { message = "Product deactivated successfully" });
+        return Ok(new { message = "Product permanently deleted" });
     }
 }
 

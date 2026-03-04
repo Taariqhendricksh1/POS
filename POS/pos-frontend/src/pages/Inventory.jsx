@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Package,
   Plus,
@@ -10,6 +10,11 @@ import {
   AlertTriangle,
   Store,
   CheckCircle,
+  Camera,
+  XCircle,
+  Power,
+  PowerOff,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { productApi } from '../api';
 import { useToast } from '../hooks/useToast';
@@ -27,6 +32,7 @@ const emptyProduct = {
   quantityInStock: '',
   reorderLevel: '10',
   sku: '',
+  imageUrl: '',
 };
 
 export default function Inventory() {
@@ -43,6 +49,10 @@ export default function Inventory() {
   const [shops, setShops] = useState([]);
   const [selectedShop, setSelectedShop] = useState('');
   const [scannedBarcode, setScannedBarcode] = useState('');
+  const [showCamera, setShowCamera] = useState(false);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -127,18 +137,19 @@ export default function Inventory() {
             name: res.data.name,
             description: res.data.description,
             category: res.data.category,
-          shop: res.data.shop || '',
-          costPrice: String(res.data.costPrice),
-          sellingPrice: String(res.data.sellingPrice),
-          discountPercentage: String(res.data.discountPercentage),
-          quantityInStock: String(res.data.quantityInStock),
-          reorderLevel: String(res.data.reorderLevel),
-          sku: res.data.sku,
+            shop: res.data.shop || '',
+            costPrice: String(res.data.costPrice),
+            sellingPrice: String(res.data.sellingPrice),
+            discountPercentage: String(res.data.discountPercentage),
+            quantityInStock: String(res.data.quantityInStock),
+            reorderLevel: String(res.data.reorderLevel),
+            sku: res.data.sku,
+            imageUrl: res.data.imageUrl || '',
+          });
+        })
+        .catch(() => {
+          // Product doesn't exist, that's fine
         });
-      })
-      .catch(() => {
-        // Product doesn't exist, that's fine
-      });
     }, 1200);
   };
 
@@ -156,10 +167,57 @@ export default function Inventory() {
       quantityInStock: String(product.quantityInStock),
       reorderLevel: String(product.reorderLevel),
       sku: product.sku,
+      imageUrl: product.imageUrl || '',
     });
     setShowForm(true);
   };
 
+  // --- Camera functions ---
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+      });
+      streamRef.current = stream;
+      setShowCamera(true);
+      // Wait for the video element to be rendered
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      }, 100);
+    } catch (err) {
+      showToast('Could not access camera', 'error');
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.6); // compress to 60% quality
+    setFormData((prev) => ({ ...prev, imageUrl: dataUrl }));
+    stopCamera();
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setShowCamera(false);
+  };
+
+  const removePhoto = () => {
+    setFormData((prev) => ({ ...prev, imageUrl: '' }));
+  };
+
+  // --- Submit ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = {
@@ -169,6 +227,7 @@ export default function Inventory() {
       discountPercentage: parseFloat(formData.discountPercentage) || 0,
       quantityInStock: parseInt(formData.quantityInStock) || 0,
       reorderLevel: parseInt(formData.reorderLevel) || 10,
+      imageUrl: formData.imageUrl || null,
     };
 
     try {
@@ -182,6 +241,7 @@ export default function Inventory() {
       setShowForm(false);
       setFormData(emptyProduct);
       setEditingProduct(null);
+      stopCamera();
       loadProducts();
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to save product';
@@ -189,11 +249,33 @@ export default function Inventory() {
     }
   };
 
+  const handleDeactivate = async (product) => {
+    try {
+      await productApi.deactivate(product.id);
+      showToast(`"${product.name}" deactivated`, 'success');
+      loadProducts();
+    } catch (err) {
+      showToast('Failed to deactivate product', 'error');
+    }
+  };
+
+  const handleActivate = async (product) => {
+    try {
+      await productApi.activate(product.id);
+      showToast(`"${product.name}" reactivated`, 'success');
+      loadProducts();
+    } catch (err) {
+      showToast('Failed to activate product', 'error');
+    }
+  };
+
   const handleDelete = async (product) => {
-    if (!window.confirm(`Deactivate "${product.name}"?`)) return;
+    if (!window.confirm(`PERMANENTLY delete "${product.name}"? This cannot be undone.`)) return;
     try {
       await productApi.delete(product.id);
-      showToast('Product deactivated', 'success');
+      showToast('Product permanently deleted', 'success');
+      setShowForm(false);
+      stopCamera();
       loadProducts();
     } catch (err) {
       showToast('Failed to delete product', 'error');
@@ -331,28 +413,81 @@ export default function Inventory() {
         </div>
       ) : (
         filteredProducts.map((product) => (
-          <div key={product.id} className="product-item" onClick={() => handleEdit(product)}>
-            <div className="product-icon">
-              <Package size={20} color="var(--text-secondary)" />
-            </div>
-            <div className="product-info">
-              <div className="product-name">{product.name}</div>
-              <div className="product-meta">
-                {product.barcode} • {product.category || 'No category'}
-                {product.shop && <> • <Store size={11} style={{ verticalAlign: -1 }} /> {product.shop}</>}
-              </div>
-            </div>
-            <div>
-              <div className="product-price">
-                {product.discountPercentage > 0 && (
-                  <span style={{ fontSize: 11, color: 'var(--text-secondary)', textDecoration: 'line-through', marginRight: 4 }}>
-                    R{product.sellingPrice.toFixed(2)}
-                  </span>
+          <div
+            key={product.id}
+            className="product-item"
+            style={{ opacity: product.isActive ? 1 : 0.5, position: 'relative' }}
+          >
+            {/* Tap main area to edit */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }} onClick={() => handleEdit(product)}>
+              <div className="product-icon" style={{ overflow: 'hidden', borderRadius: 8, flexShrink: 0 }}>
+                {product.imageUrl ? (
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8 }}
+                  />
+                ) : (
+                  <Package size={20} color="var(--text-secondary)" />
                 )}
-                R{product.effectivePrice.toFixed(2)}
               </div>
-              <div className="product-stock">
-                <span className={`badge ${getStockBadge(product)}`}>{getStockLabel(product)}</span>
+              <div className="product-info" style={{ minWidth: 0 }}>
+                <div className="product-name">
+                  {product.name}
+                  {!product.isActive && (
+                    <span style={{ fontSize: 10, color: 'var(--danger)', marginLeft: 6, fontWeight: 600 }}>INACTIVE</span>
+                  )}
+                </div>
+                <div className="product-meta">
+                  {product.barcode} • {product.category || 'No category'}
+                  {product.shop && <> • <Store size={11} style={{ verticalAlign: -1 }} /> {product.shop}</>}
+                </div>
+              </div>
+            </div>
+            {/* Right side: price + stock + actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <div onClick={() => handleEdit(product)} style={{ cursor: 'pointer' }}>
+                <div className="product-price">
+                  {product.discountPercentage > 0 && (
+                    <span style={{ fontSize: 11, color: 'var(--text-secondary)', textDecoration: 'line-through', marginRight: 4 }}>
+                      R{product.sellingPrice.toFixed(2)}
+                    </span>
+                  )}
+                  R{product.effectivePrice.toFixed(2)}
+                </div>
+                <div className="product-stock">
+                  <span className={`badge ${getStockBadge(product)}`}>{getStockLabel(product)}</span>
+                </div>
+              </div>
+              {/* Action buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {product.isActive ? (
+                  <button
+                    className="btn-icon-sm"
+                    title="Deactivate"
+                    onClick={(e) => { e.stopPropagation(); handleDeactivate(product); }}
+                    style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--warning)' }}
+                  >
+                    <PowerOff size={16} />
+                  </button>
+                ) : (
+                  <button
+                    className="btn-icon-sm"
+                    title="Reactivate"
+                    onClick={(e) => { e.stopPropagation(); handleActivate(product); }}
+                    style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--success)' }}
+                  >
+                    <Power size={16} />
+                  </button>
+                )}
+                <button
+                  className="btn-icon-sm"
+                  title="Delete permanently"
+                  onClick={(e) => { e.stopPropagation(); handleDelete(product); }}
+                  style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', color: 'var(--danger)' }}
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             </div>
           </div>
@@ -361,11 +496,11 @@ export default function Inventory() {
 
       {/* Product Form Modal */}
       {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
+        <div className="modal-overlay" onClick={() => { setShowForm(false); stopCamera(); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{editingProduct ? 'Edit Product' : 'Add Product'}</h2>
-              <button className="modal-close" onClick={() => setShowForm(false)}>
+              <button className="modal-close" onClick={() => { setShowForm(false); stopCamera(); }}>
                 <X size={16} />
               </button>
             </div>
@@ -507,6 +642,54 @@ export default function Inventory() {
                 />
               </div>
 
+              {/* Photo Capture Section */}
+              <div className="input-group">
+                <label>Product Photo (optional)</label>
+                {formData.imageUrl ? (
+                  <div style={{ position: 'relative', display: 'inline-block', marginTop: 4 }}>
+                    <img
+                      src={formData.imageUrl}
+                      alt="Product"
+                      style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 8, border: '1px solid var(--border)' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={removePhoto}
+                      style={{
+                        position: 'absolute', top: 4, right: 4,
+                        background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%',
+                        width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                      }}
+                    >
+                      <XCircle size={18} color="white" />
+                    </button>
+                  </div>
+                ) : showCamera ? (
+                  <div style={{ position: 'relative', marginTop: 4 }}>
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      style={{ width: '100%', maxHeight: 240, borderRadius: 8, background: '#000', objectFit: 'cover' }}
+                    />
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <button type="button" className="btn btn-success" style={{ flex: 1 }} onClick={capturePhoto}>
+                        <Camera size={16} /> Capture
+                      </button>
+                      <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={stopCamera}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" className="btn btn-outline" onClick={startCamera} style={{ marginTop: 4, width: '100%' }}>
+                    <Camera size={16} /> Take Photo
+                  </button>
+                )}
+                <canvas ref={canvasRef} style={{ display: 'none' }} />
+              </div>
+
               {formData.costPrice && formData.sellingPrice && (
                 <div className="card" style={{ background: 'var(--bg)', marginBottom: 16 }}>
                   <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>Profit Margin</div>
@@ -528,17 +711,48 @@ export default function Inventory() {
                   {editingProduct ? 'Update Product' : 'Add Product'}
                 </button>
                 {editingProduct && (
-                  <button
-                    type="button"
-                    className="btn btn-danger"
-                    style={{ flex: 1 }}
-                    onClick={() => {
-                      handleDelete(editingProduct);
-                      setShowForm(false);
-                    }}
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <>
+                    {editingProduct.isActive ? (
+                      <button
+                        type="button"
+                        className="btn btn-warning"
+                        style={{ flex: 1 }}
+                        onClick={() => {
+                          handleDeactivate(editingProduct);
+                          setShowForm(false);
+                          stopCamera();
+                        }}
+                        title="Deactivate"
+                      >
+                        <PowerOff size={16} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-success"
+                        style={{ flex: 1 }}
+                        onClick={() => {
+                          handleActivate(editingProduct);
+                          setShowForm(false);
+                          stopCamera();
+                        }}
+                        title="Reactivate"
+                      >
+                        <Power size={16} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      style={{ flex: 1 }}
+                      onClick={() => {
+                        handleDelete(editingProduct);
+                      }}
+                      title="Delete permanently"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </>
                 )}
               </div>
             </form>

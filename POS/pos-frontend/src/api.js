@@ -20,6 +20,8 @@ export const productApi = {
   create: (product) => api.post('/products', product),
   update: (id, product) => api.put(`/products/${id}`, product),
   updateStock: (id, quantityChange) => api.patch(`/products/${id}/stock`, { quantityChange }),
+  deactivate: (id) => api.patch(`/products/${id}/deactivate`),
+  activate: (id) => api.patch(`/products/${id}/activate`),
   delete: (id) => api.delete(`/products/${id}`),
 };
 

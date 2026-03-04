@@ -93,14 +93,28 @@ public class ProductService
         return result.ModifiedCount > 0;
     }
 
-    public async Task<bool> DeleteAsync(string id)
+    public async Task<bool> DeactivateAsync(string id)
     {
-        // Soft delete
         var update = Builders<Product>.Update
             .Set(p => p.IsActive, false)
             .Set(p => p.UpdatedAt, DateTime.UtcNow);
         var result = await _products.UpdateOneAsync(p => p.Id == id, update);
         return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> ActivateAsync(string id)
+    {
+        var update = Builders<Product>.Update
+            .Set(p => p.IsActive, true)
+            .Set(p => p.UpdatedAt, DateTime.UtcNow);
+        var result = await _products.UpdateOneAsync(p => p.Id == id, update);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> HardDeleteAsync(string id)
+    {
+        var result = await _products.DeleteOneAsync(p => p.Id == id);
+        return result.DeletedCount > 0;
     }
 
     public async Task<List<Product>> GetLowStockAsync(string? shop = null)
