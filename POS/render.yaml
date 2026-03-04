@@ -10,7 +10,7 @@ services:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
       - key: MongoDb__ConnectionString
-        sync: false # Set manually in Render dashboard
+        value: mongodb+srv://taariqhendricksh1_db_user:EKI7A7WDCPtVgxYk@clusterpos.zyrhmrz.mongodb.net/?appName=ClusterPos
       - key: MongoDb__DatabaseName
         value: pos_db
       - key: Email__SmtpServer
@@ -44,4 +44,4 @@ services:
     plan: free
     envVars:
       - key: API_URL
-        sync: false # Set to your API URL after deploy, e.g. https://pos-api.onrender.com
+        value: https://pos-api-u1rh.onrender.com 
