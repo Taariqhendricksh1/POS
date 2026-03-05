@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Store,
   ChevronDown,
+  ChevronUp,
   DollarSign,
   Calendar,
   CreditCard,
@@ -25,6 +26,79 @@ function formatDate(date) {
   return date.toISOString().split('T')[0];
 }
 
+const DATE_PRESETS = [
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'this_week', label: 'This Week' },
+  { value: 'this_month', label: 'This Month' },
+  { value: 'last_30', label: 'Last 30 Days' },
+  { value: 'custom', label: 'Custom Range' },
+];
+
+function getPresetDates(preset) {
+  const now = new Date();
+  switch (preset) {
+    case 'today': {
+      const d = formatDate(now);
+      return [d, d];
+    }
+    case 'yesterday': {
+      const d = new Date(now);
+      d.setDate(d.getDate() - 1);
+      const s = formatDate(d);
+      return [s, s];
+    }
+    case 'this_week': {
+      const day = now.getDay();
+      const start = new Date(now);
+      start.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+      return [formatDate(start), formatDate(now)];
+    }
+    case 'this_month': {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return [formatDate(start), formatDate(now)];
+    }
+    case 'last_30': {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 30);
+      return [formatDate(start), formatDate(now)];
+    }
+    default:
+      return [formatDate(now), formatDate(now)];
+  }
+}
+
+function Accordion({ title, icon, children, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '12px 16px', background: 'var(--card-bg, white)', border: '1px solid var(--border)',
+          borderRadius: open ? '10px 10px 0 0' : 10, cursor: 'pointer', fontSize: 15, fontWeight: 600,
+          color: 'var(--text)',
+        }}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {icon}
+          {title}
+        </span>
+        {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+      </button>
+      {open && (
+        <div style={{
+          border: '1px solid var(--border)', borderTop: 'none',
+          borderRadius: '0 0 10px 10px', padding: 16, background: 'var(--card-bg, white)',
+        }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [lowStock, setLowStock] = useState([]);
@@ -34,6 +108,7 @@ export default function Dashboard() {
   // Sales summary
   const [salesSummary, setSalesSummary] = useState(null);
   const [salesLoading, setSalesLoading] = useState(false);
+  const [datePreset, setDatePreset] = useState('today');
   const [dateFrom, setDateFrom] = useState(formatDate(new Date()));
   const [dateTo, setDateTo] = useState(formatDate(new Date()));
   const navigate = useNavigate();
@@ -91,9 +166,20 @@ export default function Dashboard() {
     }
   };
 
+  const handlePresetChange = (preset) => {
+    setDatePreset(preset);
+    if (preset !== 'custom') {
+      const [from, to] = getPresetDates(preset);
+      setDateFrom(from);
+      setDateTo(to);
+      loadSalesSummary(from, to);
+    }
+  };
+
   const handleDateChange = (newFrom, newTo) => {
     setDateFrom(newFrom);
     setDateTo(newTo);
+    setDatePreset('custom');
     loadSalesSummary(newFrom, newTo);
   };
 
@@ -106,21 +192,31 @@ export default function Dashboard() {
   }
 
   return (
-    <div>
+    <div style={{ paddingBottom: 80 }}>
       <div className="page-header">
         <h1>Dashboard</h1>
-        <p>Store overview</p>
+      </div>
+
+      {/* Quick Actions — top */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        <button className="btn btn-primary" onClick={() => navigate('/sale')} style={{ flex: 1 }}>
+          <ShoppingCart size={18} /> New Sale
+        </button>
+        <button className="btn btn-outline" onClick={() => navigate('/inventory')} style={{ flex: 1 }}>
+          <Package size={18} /> Inventory
+        </button>
       </div>
 
       {/* Shop Filter */}
       {shops.length > 0 && (
-        <div className="shop-filter" style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Store size={18} color="var(--primary)" />
             <select
               value={selectedShop}
               onChange={(e) => setSelectedShop(e.target.value)}
               className="shop-select"
+              style={{ flex: 1 }}
             >
               <option value="">All Shops</option>
               {shops.map((shop) => (
@@ -131,124 +227,134 @@ export default function Dashboard() {
         </div>
       )}
 
-      <div className="stats-grid">
-        <div className="stat-card" onClick={() => navigate('/inventory')}>
-          <div className="stat-label">
-            <Package size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
-            Products
-          </div>
-          <div className="stat-value">{stats?.totalProducts ?? 0}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">
-            <TrendingUp size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
-            Stock Value
-          </div>
-          <div className="stat-value success">R{(stats?.totalStockValue ?? 0).toLocaleString()}</div>
-        </div>
-        <div className="stat-card" onClick={() => navigate('/inventory')}>
-          <div className="stat-label">
-            <AlertTriangle size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
-            Low Stock
-          </div>
-          <div className="stat-value danger">{stats?.lowStockCount ?? 0}</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">
-            <XCircle size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
-            Out of Stock
-          </div>
-          <div className="stat-value danger">{stats?.outOfStockCount ?? 0}</div>
-        </div>
+      {/* Date Range — preset dropdown + custom inputs */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        <Calendar size={16} color="var(--text-secondary)" style={{ flexShrink: 0 }} />
+        <select
+          value={datePreset}
+          onChange={(e) => handlePresetChange(e.target.value)}
+          style={{
+            padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 6px)',
+            fontSize: 13, background: 'var(--bg)', color: 'var(--text)', flex: 1, minWidth: 0,
+          }}
+        >
+          {DATE_PRESETS.map((p) => (
+            <option key={p.value} value={p.value}>{p.label}</option>
+          ))}
+        </select>
+        {datePreset === 'custom' && (
+          <>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => handleDateChange(e.target.value, dateTo)}
+              style={{
+                padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 6px)',
+                fontSize: 13, background: 'var(--bg)', color: 'var(--text)', flex: 1, minWidth: 0,
+              }}
+            />
+            <span style={{ color: 'var(--text-secondary)', fontSize: 13, flexShrink: 0 }}>to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => handleDateChange(dateFrom, e.target.value)}
+              style={{
+                padding: '8px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 6px)',
+                fontSize: 13, background: 'var(--bg)', color: 'var(--text)', flex: 1, minWidth: 0,
+              }}
+            />
+          </>
+        )}
       </div>
 
-      {/* Quick Actions */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-        <button className="btn btn-primary" onClick={() => navigate('/sale')} style={{ flex: 1 }}>
-          <ShoppingCart size={18} /> New Sale
-        </button>
-        <button className="btn btn-outline" onClick={() => navigate('/inventory')} style={{ flex: 1 }}>
-          <Package size={18} /> Inventory
-        </button>
-      </div>
-
-      {/* Sales Summary */}
-      <div style={{ marginBottom: 20 }}>
-        <h3 style={{ fontSize: 16, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-          <BarChart3 size={16} color="var(--primary)" />
-          Sales Summary
-        </h3>
-
-        {/* Date Range Picker */}
-        <div className="card" style={{ padding: 16, marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Calendar size={16} color="var(--text-secondary)" />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => handleDateChange(e.target.value, dateTo)}
-                style={{
-                  flex: 1,
-                  padding: '8px 10px',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: 13,
-                  background: 'var(--bg)',
-                  color: 'var(--text)',
-                  minWidth: 0,
-                }}
-              />
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13, flexShrink: 0 }}>to</span>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => handleDateChange(dateFrom, e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: '8px 10px',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-sm)',
-                  fontSize: 13,
-                  background: 'var(--bg)',
-                  color: 'var(--text)',
-                  minWidth: 0,
-                }}
-              />
+      {/* === ACCORDION: Shop Overview === */}
+      <Accordion
+        title="Shop Overview"
+        icon={<Store size={16} color="var(--primary)" />}
+        defaultOpen
+      >
+        <div className="stats-grid">
+          <div className="stat-card" onClick={() => navigate('/inventory')}>
+            <div className="stat-label">
+              <Package size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+              Products
             </div>
+            <div className="stat-value">{stats?.totalProducts ?? 0}</div>
           </div>
-          {/* Quick date presets */}
-          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
-            {[
-              { label: 'Today', fn: () => { const d = formatDate(new Date()); handleDateChange(d, d); } },
-              { label: 'Yesterday', fn: () => { const d = new Date(); d.setDate(d.getDate() - 1); const s = formatDate(d); handleDateChange(s, s); } },
-              { label: 'This Week', fn: () => { const now = new Date(); const day = now.getDay(); const start = new Date(now); start.setDate(now.getDate() - (day === 0 ? 6 : day - 1)); handleDateChange(formatDate(start), formatDate(now)); } },
-              { label: 'This Month', fn: () => { const now = new Date(); const start = new Date(now.getFullYear(), now.getMonth(), 1); handleDateChange(formatDate(start), formatDate(now)); } },
-              { label: 'Last 30 Days', fn: () => { const now = new Date(); const start = new Date(); start.setDate(now.getDate() - 30); handleDateChange(formatDate(start), formatDate(now)); } },
-            ].map((preset) => (
-              <button
-                key={preset.label}
-                onClick={preset.fn}
-                style={{
-                  padding: '4px 10px',
-                  fontSize: 12,
-                  border: '1px solid var(--border)',
-                  borderRadius: 20,
-                  background: 'var(--bg)',
-                  color: 'var(--text-secondary)',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {preset.label}
-              </button>
-            ))}
+          <div className="stat-card">
+            <div className="stat-label">
+              <TrendingUp size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+              Stock Value
+            </div>
+            <div className="stat-value success">R{(stats?.totalStockValue ?? 0).toLocaleString()}</div>
+          </div>
+          <div className="stat-card" onClick={() => navigate('/inventory')}>
+            <div className="stat-label">
+              <AlertTriangle size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+              Low Stock
+            </div>
+            <div className="stat-value danger">{stats?.lowStockCount ?? 0}</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-label">
+              <XCircle size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+              Out of Stock
+            </div>
+            <div className="stat-value danger">{stats?.outOfStockCount ?? 0}</div>
           </div>
         </div>
 
-        {/* Sales Stats */}
+        {/* Low Stock Alerts */}
+        {lowStock.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <h4 style={{ fontSize: 13, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertTriangle size={14} color="var(--warning)" />
+              Low Stock Alerts
+            </h4>
+            {lowStock.slice(0, 5).map((product) => (
+              <div
+                key={product.id}
+                className="product-item"
+                onClick={() => navigate('/inventory')}
+              >
+                <div className="product-icon" style={{ overflow: 'hidden', borderRadius: 8, flexShrink: 0 }}>
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.name} style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8 }} />
+                  ) : (
+                    <Package size={20} color="var(--text-secondary)" />
+                  )}
+                </div>
+                <div className="product-info">
+                  <div className="product-name">{product.name}</div>
+                  <div className="product-meta">
+                    {product.barcode}
+                    {product.shop && <> • <Store size={11} style={{ verticalAlign: -1 }} /> {product.shop}</>}
+                  </div>
+                </div>
+                <div>
+                  <span className={`badge ${product.quantityInStock === 0 ? 'badge-danger' : 'badge-warning'}`}>
+                    {product.quantityInStock === 0 ? 'Out of stock' : `${product.quantityInStock} left`}
+                  </span>
+                </div>
+              </div>
+            ))}
+            {lowStock.length > 5 && (
+              <button className="btn btn-outline btn-sm" onClick={() => navigate('/inventory')} style={{ marginTop: 8 }}>
+                View all {lowStock.length} items <ArrowRight size={14} />
+              </button>
+            )}
+          </div>
+        )}
+      </Accordion>
+
+      {/* === ACCORDION: Sales Summary === */}
+      <Accordion
+        title="Sales Summary"
+        icon={<BarChart3 size={16} color="var(--primary)" />}
+        defaultOpen
+      >
         {salesLoading ? (
-          <div style={{ textAlign: 'center', padding: 30 }}>
+          <div style={{ textAlign: 'center', padding: 24 }}>
             <div className="spinner" style={{ borderTopColor: 'var(--primary)', borderColor: 'var(--border)' }} />
           </div>
         ) : salesSummary ? (
@@ -284,9 +390,9 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* Payment Breakdown & Details */}
+            {/* Payment Breakdown */}
             {salesSummary.totalOrders > 0 && (
-              <div className="card" style={{ padding: 16, marginTop: 12 }}>
+              <div style={{ marginTop: 14 }}>
                 <h4 style={{ fontSize: 12, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10 }}>Payment Breakdown</h4>
                 {Object.entries(salesSummary.paymentBreakdown).map(([method, amount]) => (
                   <div key={method} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
@@ -313,96 +419,61 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* EFT Payment Status */}
-            {(salesSummary.eftOutstandingCount > 0 || salesSummary.eftReceivedCount > 0) && (
-              <div className="card" style={{ padding: 16, marginTop: 12 }}>
-                <h4 style={{ fontSize: 12, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Building2 size={14} /> EFT Payment Status
-                </h4>
-                {salesSummary.eftOutstandingCount > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#fef3c7', borderRadius: 'var(--radius-sm)', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#92400e' }}>
-                      <Clock size={16} />
-                      <span><strong>{salesSummary.eftOutstandingCount}</strong> Outstanding</span>
-                    </div>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: '#92400e' }}>
-                      R{salesSummary.eftOutstandingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                {salesSummary.eftReceivedCount > 0 && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#dcfce7', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#166534' }}>
-                      <CheckCircle2 size={16} />
-                      <span><strong>{salesSummary.eftReceivedCount}</strong> Received</span>
-                    </div>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: '#166534' }}>
-                      R{salesSummary.eftReceivedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-
             {salesSummary.totalOrders === 0 && (
-              <div className="card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
-                <Receipt size={32} style={{ marginBottom: 8, opacity: 0.4 }} />
+              <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
+                <Receipt size={28} style={{ marginBottom: 6, opacity: 0.4 }} />
                 <p style={{ margin: 0, fontSize: 14 }}>No completed sales for this period</p>
               </div>
             )}
           </>
         ) : null}
-      </div>
+      </Accordion>
 
-      {/* Low Stock Alerts */}
-      {lowStock.length > 0 && (
-        <div>
-          <h3 style={{ fontSize: 16, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <AlertTriangle size={16} color="var(--warning)" />
-            Low Stock Alerts
-          </h3>
-          {lowStock.slice(0, 5).map((product) => (
-            <div
-              key={product.id}
-              className="product-item"
-              onClick={() => navigate('/inventory')}
-            >
-              <div className="product-icon" style={{ overflow: 'hidden', borderRadius: 8, flexShrink: 0 }}>
-                {product.imageUrl ? (
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8 }}
-                  />
-                ) : (
-                  <Package size={20} color="var(--text-secondary)" />
-                )}
-              </div>
-              <div className="product-info">
-                <div className="product-name">{product.name}</div>
-                <div className="product-meta">
-                  {product.barcode}
-                  {product.shop && <> • <Store size={11} style={{ verticalAlign: -1 }} /> {product.shop}</>}
+      {/* === ACCORDION: Pending Transactions === */}
+      <Accordion
+        title="Pending Transactions"
+        icon={<Clock size={16} color="var(--warning, #f59e0b)" />}
+        defaultOpen={false}
+      >
+        {salesLoading ? (
+          <div style={{ textAlign: 'center', padding: 24 }}>
+            <div className="spinner" style={{ borderTopColor: 'var(--primary)', borderColor: 'var(--border)' }} />
+          </div>
+        ) : salesSummary && (salesSummary.eftOutstandingCount > 0 || salesSummary.eftReceivedCount > 0) ? (
+          <div>
+            <h4 style={{ fontSize: 12, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Building2 size={14} /> EFT Payment Status
+            </h4>
+            {salesSummary.eftOutstandingCount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#fef3c7', borderRadius: 8, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#92400e' }}>
+                  <Clock size={16} />
+                  <span><strong>{salesSummary.eftOutstandingCount}</strong> Outstanding</span>
                 </div>
-              </div>
-              <div>
-                <span className={`badge ${product.quantityInStock === 0 ? 'badge-danger' : 'badge-warning'}`}>
-                  {product.quantityInStock === 0 ? 'Out of stock' : `${product.quantityInStock} left`}
+                <span style={{ fontWeight: 700, fontSize: 14, color: '#92400e' }}>
+                  R{salesSummary.eftOutstandingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
-            </div>
-          ))}
-          {lowStock.length > 5 && (
-            <button
-              className="btn btn-outline btn-sm"
-              onClick={() => navigate('/inventory')}
-              style={{ marginTop: 8 }}
-            >
-              View all {lowStock.length} items <ArrowRight size={14} />
-            </button>
-          )}
-        </div>
-      )}
+            )}
+            {salesSummary.eftReceivedCount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#dcfce7', borderRadius: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#166534' }}>
+                  <CheckCircle2 size={16} />
+                  <span><strong>{salesSummary.eftReceivedCount}</strong> Received</span>
+                </div>
+                <span style={{ fontWeight: 700, fontSize: 14, color: '#166534' }}>
+                  R{salesSummary.eftReceivedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
+            <CheckCircle2 size={28} style={{ marginBottom: 6, opacity: 0.4 }} />
+            <p style={{ margin: 0, fontSize: 14 }}>No pending EFT transactions for this period</p>
+          </div>
+        )}
+      </Accordion>
     </div>
   );
 }
