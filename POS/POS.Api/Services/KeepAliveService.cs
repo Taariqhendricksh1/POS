@@ -20,16 +20,23 @@ public class KeepAliveService : BackgroundService
         // Wait for the app to fully start before pinging
         await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
 
-        var port = Environment.GetEnvironmentVariable("PORT") ?? "5100";
-        var selfUrl = $"http://localhost:{port}/api/health";
+        // Use external URL so Render counts it as real traffic
+        var selfUrl = Environment.GetEnvironmentVariable("RENDER_EXTERNAL_URL");
+        if (string.IsNullOrEmpty(selfUrl))
+        {
+            // Fallback for local dev
+            var port = Environment.GetEnvironmentVariable("PORT") ?? "5100";
+            selfUrl = $"http://localhost:{port}";
+        }
+        var healthUrl = $"{selfUrl}/api/health";
 
-        _logger.LogInformation("KeepAlive service started — pinging {Url} every 5 minutes", selfUrl);
+        _logger.LogInformation("KeepAlive service started — pinging {Url} every 5 minutes", healthUrl);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                var response = await _httpClient.GetAsync(selfUrl, stoppingToken);
+                var response = await _httpClient.GetAsync(healthUrl, stoppingToken);
                 _logger.LogDebug("KeepAlive ping: {StatusCode}", response.StatusCode);
             }
             catch (Exception ex)
