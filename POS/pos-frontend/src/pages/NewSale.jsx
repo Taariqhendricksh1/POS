@@ -339,7 +339,7 @@ export default function NewSale() {
         sku: addProductSku,
         costPrice: 0,
         description: '',
-        reorderLevel: 5,
+        reorderLevel: 0,
       });
       showToast(`${addProductName} added to inventory`, 'success');
       // Now add it to the order using barcode or SKU
@@ -798,7 +798,7 @@ export default function NewSale() {
                 <input type="text" value={addProductBarcode} onChange={(e) => setAddProductBarcode(e.target.value)} />
               </div>
               <div className="input-group">
-                <label>SKU {!addProductBarcode ? '*' : ''}</label>
+                <label>SKU {!addProductBarcode ? '*' : <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 400 }}>(optional if barcode provided)</span>}</label>
                 <input type="text" value={addProductSku} onChange={(e) => setAddProductSku(e.target.value)} placeholder="SKU code" required={!addProductBarcode} />
               </div>
               <div className="input-group">
