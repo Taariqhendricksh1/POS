@@ -31,4 +31,14 @@ public class SettingsController : ControllerBase
         var updated = await _settingsService.UpdateAsync(settings);
         return Ok(updated);
     }
+
+    /// <summary>
+    /// Returns the list of configured shops. Available to all authenticated users.
+    /// </summary>
+    [HttpGet("shops")]
+    public async Task<ActionResult<List<string>>> GetShops()
+    {
+        var settings = await _settingsService.GetAsync();
+        return Ok(settings.Shops ?? new List<string>());
+    }
 }

@@ -23,7 +23,7 @@ import {
   PackageX,
   Percent,
 } from 'lucide-react';
-import { orderApi, customerApi, productApi } from '../api';
+import { orderApi, customerApi, productApi, settingsApi } from '../api';
 import { useToast } from '../hooks/useToast';
 import BarcodeScanner from '../components/BarcodeScanner';
 
@@ -80,6 +80,7 @@ export default function NewSale() {
   const [addProductStock, setAddProductStock] = useState('1');
   const [addProductShop, setAddProductShop] = useState('');
   const [addingProduct, setAddingProduct] = useState(false);
+  const [shops, setShops] = useState([]);
   // Out of stock
   const [outOfStockProduct, setOutOfStockProduct] = useState(null);
   const [stockUpdateQty, setStockUpdateQty] = useState('1');
@@ -88,6 +89,11 @@ export default function NewSale() {
   const [discountItemId, setDiscountItemId] = useState(null);
   const [discountValue, setDiscountValue] = useState('');
   const { showToast } = useToast();
+
+  // Load shops from settings
+  useEffect(() => {
+    settingsApi.getShops().then(res => setShops(res.data)).catch(() => {});
+  }, []);
 
   // Debounced customer search
   useEffect(() => {
@@ -719,7 +725,12 @@ export default function NewSale() {
               </div>
               <div className="input-group">
                 <label>Shop *</label>
-                <input type="text" value={addProductShop} onChange={(e) => setAddProductShop(e.target.value)} placeholder="e.g. Main Store" required />
+                <select value={addProductShop} onChange={(e) => setAddProductShop(e.target.value)} required>
+                  <option value="">Select shop...</option>
+                  {shops.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
               </div>
               <button type="submit" className="btn btn-success" disabled={addingProduct}>
                 {addingProduct ? <><span className="spinner" /> Saving...</> : <><PackagePlus size={16} /> Add Product & Add to Order</>}

@@ -63,6 +63,7 @@ public class SettingsService
             .Set(s => s.BankBranchCode, updated.BankBranchCode)
             .Set(s => s.BankAccountType, updated.BankAccountType)
             .Set(s => s.BankReference, updated.BankReference)
+            .Set(s => s.Shops, updated.Shops ?? new List<string>())
             .Set(s => s.UpdatedAt, DateTime.UtcNow);
 
         await _settings.UpdateOneAsync(s => s.Id == existing.Id, update);

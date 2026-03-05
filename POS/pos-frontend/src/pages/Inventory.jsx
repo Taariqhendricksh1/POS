@@ -16,7 +16,7 @@ import {
   PowerOff,
   Image as ImageIcon,
 } from 'lucide-react';
-import { productApi } from '../api';
+import { productApi, settingsApi } from '../api';
 import { useToast } from '../hooks/useToast';
 import BarcodeScanner from '../components/BarcodeScanner';
 
@@ -78,7 +78,7 @@ export default function Inventory() {
 
   const loadShops = async () => {
     try {
-      const res = await productApi.getShops();
+      const res = await settingsApi.getShops();
       setShops(res.data);
     } catch (err) {
       console.error('Failed to load shops:', err);
@@ -589,21 +589,16 @@ export default function Inventory() {
 
               <div className="input-group">
                 <label>Shop *</label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    value={formData.shop}
-                    onChange={(e) => setFormData({ ...formData, shop: e.target.value })}
-                    placeholder="e.g. Main Store, Warehouse..."
-                    list="shop-suggestions"
-                    required
-                  />
-                  <datalist id="shop-suggestions">
-                    {shops.map((s) => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
-                </div>
+                <select
+                  value={formData.shop}
+                  onChange={(e) => setFormData({ ...formData, shop: e.target.value })}
+                  required
+                >
+                  <option value="">Select shop...</option>
+                  {shops.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

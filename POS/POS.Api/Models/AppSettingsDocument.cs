@@ -49,6 +49,10 @@ public class AppSettingsDocument
     [BsonElement("bankReference")]
     public string BankReference { get; set; } = string.Empty;
 
+    // Shop locations
+    [BsonElement("shops")]
+    public List<string> Shops { get; set; } = new();
+
     [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

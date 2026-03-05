@@ -19,7 +19,7 @@ import {
   Clock,
   CheckCircle2,
 } from 'lucide-react';
-import { productApi, orderApi } from '../api';
+import { productApi, orderApi, settingsApi } from '../api';
 
 function formatDate(date) {
   return date.toISOString().split('T')[0];
@@ -52,7 +52,7 @@ export default function Dashboard() {
 
   const loadShops = async () => {
     try {
-      const res = await productApi.getShops();
+      const res = await settingsApi.getShops();
       setShops(res.data);
     } catch (err) {
       console.error('Failed to load shops:', err);
