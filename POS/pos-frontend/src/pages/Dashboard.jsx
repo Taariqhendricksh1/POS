@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Package,
@@ -21,6 +21,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { productApi, orderApi, settingsApi } from '../api';
+import { ShopContext } from '../App';
 
 function formatDate(date) {
   return date.toISOString().split('T')[0];
@@ -32,6 +33,9 @@ const DATE_PRESETS = [
   { value: 'this_week', label: 'This Week' },
   { value: 'this_month', label: 'This Month' },
   { value: 'last_30', label: 'Last 30 Days' },
+  { value: '6_months', label: '6 Months' },
+  { value: '1_year', label: '1 Year' },
+  { value: 'all_time', label: 'All Time' },
   { value: 'custom', label: 'Custom Range' },
 ];
 
@@ -62,6 +66,19 @@ function getPresetDates(preset) {
       const start = new Date(now);
       start.setDate(now.getDate() - 30);
       return [formatDate(start), formatDate(now)];
+    }
+    case '6_months': {
+      const start = new Date(now);
+      start.setMonth(now.getMonth() - 6);
+      return [formatDate(start), formatDate(now)];
+    }
+    case '1_year': {
+      const start = new Date(now);
+      start.setFullYear(now.getFullYear() - 1);
+      return [formatDate(start), formatDate(now)];
+    }
+    case 'all_time': {
+      return ['2000-01-01', formatDate(now)];
     }
     default:
       return [formatDate(now), formatDate(now)];
@@ -100,6 +117,7 @@ function Accordion({ title, icon, children, defaultOpen = false }) {
 }
 
 export default function Dashboard() {
+  const { setShopName } = useContext(ShopContext);
   const [stats, setStats] = useState(null);
   const [lowStock, setLowStock] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -214,7 +232,7 @@ export default function Dashboard() {
             <Store size={18} color="var(--primary)" />
             <select
               value={selectedShop}
-              onChange={(e) => setSelectedShop(e.target.value)}
+              onChange={(e) => { setSelectedShop(e.target.value); setShopName(e.target.value); }}
               className="shop-select"
               style={{ flex: 1 }}
             >

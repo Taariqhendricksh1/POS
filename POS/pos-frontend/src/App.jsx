@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, createContext } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Package, BarChart3, History, Users, LogOut, Shield, UserCircle, Lock, Settings } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
@@ -14,6 +14,8 @@ import SettingsPage from './pages/Settings';
 import Toast from './components/Toast';
 import { ToastProvider } from './hooks/useToast';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+
+export const ShopContext = createContext({ shopName: '', setShopName: () => {} });
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -32,6 +34,7 @@ function AppLayout() {
   const { user, logout, isAdmin } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shopName, setShopName] = useState('');
   const menuRef = useRef(null);
 
   const handleLogout = () => {
@@ -54,11 +57,12 @@ function AppLayout() {
   if (!user) return null;
 
   return (
+    <ShopContext.Provider value={{ shopName, setShopName }}>
     <>
       {/* Top header with profile menu */}
       <div className="top-header">
         <div className="top-header-inner">
-          <span className="top-header-title">POS</span>
+          <span className="top-header-title">{shopName ? `POS - ${shopName}` : 'POS'}</span>
           <div className="profile-menu" ref={menuRef}>
             <button className="profile-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="Profile menu">
               <UserCircle size={28} />
@@ -133,6 +137,7 @@ function AppLayout() {
 
       <Toast />
     </>
+    </ShopContext.Provider>
   );
 }
 
