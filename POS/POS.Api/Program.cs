@@ -124,7 +124,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Unauthenticated health/wake-up endpoint
-app.MapGet("/api/health", () => Results.Ok(new { status = "ok", time = DateTime.UtcNow }));
+app.MapGet("/api/health", () => Results.Ok(new { message = "I am awake" }));
 
 // Seed admin user
 using (var scope = app.Services.CreateScope())

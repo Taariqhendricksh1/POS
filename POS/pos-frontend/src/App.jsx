@@ -144,11 +144,6 @@ function AppLayout() {
 }
 
 export default function App() {
-  // Wake up API/DB on first load (unauthenticated)
-  useEffect(() => {
-    fetch('/api/health').catch(() => {});
-  }, []);
-
   return (
     <AuthProvider>
       <ToastProvider>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { LogIn, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { LogIn, Mail, Lock, Eye, EyeOff, Zap } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
@@ -9,6 +9,8 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [waking, setWaking] = useState(false);
+  const [wakeMsg, setWakeMsg] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -23,6 +25,20 @@ export default function Login() {
       setError(err.response?.data?.message || 'Invalid email or password');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleWake = async () => {
+    setWaking(true);
+    setWakeMsg('');
+    try {
+      const res = await fetch('/api/health');
+      const data = await res.json();
+      setWakeMsg(data.message || 'Backend is awake');
+    } catch {
+      setWakeMsg('Could not reach backend');
+    } finally {
+      setWaking(false);
     }
   };
 
@@ -135,6 +151,37 @@ export default function Login() {
               Forgot password?
             </Link>
           </div>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: 24 }}>
+          <button
+            onClick={handleWake}
+            disabled={waking}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: waking ? 'wait' : 'pointer',
+              color: 'var(--text-secondary)',
+              fontSize: 12,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '6px 12px',
+              borderRadius: 6,
+              transition: 'color 0.2s',
+            }}
+          >
+            {waking ? (
+              <><span className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} /> Waking backend...</>
+            ) : (
+              <><Zap size={12} /> Wake Backend</>
+            )}
+          </button>
+          {wakeMsg && (
+            <div style={{ fontSize: 11, color: wakeMsg.includes('Could not') ? 'var(--danger)' : 'var(--success, #16a34a)', marginTop: 4 }}>
+              {wakeMsg}
+            </div>
+          )}
         </div>
       </div>
     </div>
