@@ -427,7 +427,29 @@ public class OrderService
         order.DiscountTotal = order.Items.Sum(i => i.Quantity * (i.UnitPrice - i.EffectivePrice));
         var taxableAmount = order.Subtotal - order.DiscountTotal;
         order.TaxAmount = Math.Round(taxableAmount * order.TaxRate / (100 + order.TaxRate), 2); // VAT inclusive
-        order.Total = taxableAmount;
+        order.Total = taxableAmount + order.ShippingCost;
+    }
+
+    public async Task<Order?> SetShippingCostAsync(string orderId, decimal shippingCost)
+    {
+        var order = await _orders.Find(o => o.Id == orderId).FirstOrDefaultAsync();
+        if (order == null || order.Status != OrderStatus.Pending) return null;
+
+        order.ShippingCost = Math.Max(0, shippingCost);
+        RecalculateTotals(order);
+        await _orders.ReplaceOneAsync(o => o.Id == orderId, order);
+        return order;
+    }
+
+    public async Task<Order?> SetDeliveryInfoAsync(string orderId, bool deliveryRequired, OrderDeliveryAddress? address)
+    {
+        var order = await _orders.Find(o => o.Id == orderId).FirstOrDefaultAsync();
+        if (order == null || order.Status != OrderStatus.Pending) return null;
+
+        order.DeliveryRequired = deliveryRequired;
+        order.DeliveryAddress = deliveryRequired ? address : null;
+        await _orders.ReplaceOneAsync(o => o.Id == orderId, order);
+        return order;
     }
 
     public async Task<List<Order>> GetOrdersByCustomerIdAsync(string customerId) =>

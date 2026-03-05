@@ -68,6 +68,30 @@ public class Order
 
     [BsonElement("eftPaymentReceivedAt")]
     public DateTime? EftPaymentReceivedAt { get; set; }
+
+    [BsonElement("shippingCost")]
+    public decimal ShippingCost { get; set; }
+
+    [BsonElement("deliveryRequired")]
+    public bool DeliveryRequired { get; set; }
+
+    [BsonElement("deliveryAddress")]
+    public OrderDeliveryAddress? DeliveryAddress { get; set; }
+}
+
+public class OrderDeliveryAddress
+{
+    [BsonElement("street")]
+    public string Street { get; set; } = string.Empty;
+
+    [BsonElement("city")]
+    public string City { get; set; } = string.Empty;
+
+    [BsonElement("province")]
+    public string Province { get; set; } = string.Empty;
+
+    [BsonElement("postalCode")]
+    public string PostalCode { get; set; } = string.Empty;
 }
 
 public class OrderItem

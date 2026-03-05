@@ -161,6 +161,29 @@ public class OrdersController : ControllerBase
         return Ok(new { message = "Order deleted successfully" });
     }
 
+    [HttpPatch("{id}/shipping")]
+    public async Task<ActionResult<Order>> SetShippingCost(string id, [FromBody] SetShippingCostRequest request)
+    {
+        var order = await _orderService.SetShippingCostAsync(id, request.ShippingCost);
+        if (order == null) return BadRequest(new { message = "Could not update shipping cost." });
+        return Ok(order);
+    }
+
+    [HttpPatch("{id}/delivery")]
+    public async Task<ActionResult<Order>> SetDeliveryInfo(string id, [FromBody] SetDeliveryInfoRequest request)
+    {
+        var address = request.DeliveryRequired ? new OrderDeliveryAddress
+        {
+            Street = request.Street ?? string.Empty,
+            City = request.City ?? string.Empty,
+            Province = request.Province ?? string.Empty,
+            PostalCode = request.PostalCode ?? string.Empty,
+        } : null;
+        var order = await _orderService.SetDeliveryInfoAsync(id, request.DeliveryRequired, address);
+        if (order == null) return BadRequest(new { message = "Could not update delivery info." });
+        return Ok(order);
+    }
+
     [HttpGet("customer/{customerId}")]
     public async Task<ActionResult<CustomerOrderSummary>> GetCustomerOrders(string customerId)
     {
@@ -195,4 +218,18 @@ public class CompleteOrderRequest
 public class UpdateItemDiscountRequest
 {
     public decimal DiscountPercentage { get; set; }
+}
+
+public class SetShippingCostRequest
+{
+    public decimal ShippingCost { get; set; }
+}
+
+public class SetDeliveryInfoRequest
+{
+    public bool DeliveryRequired { get; set; }
+    public string? Street { get; set; }
+    public string? City { get; set; }
+    public string? Province { get; set; }
+    public string? PostalCode { get; set; }
 }

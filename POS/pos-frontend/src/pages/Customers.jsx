@@ -17,6 +17,7 @@ import {
   CreditCard,
   Hash,
   Package,
+  Truck,
 } from 'lucide-react';
 import { customerApi, orderApi } from '../api';
 import { useToast } from '../hooks/useToast';
@@ -260,6 +261,27 @@ export default function Customers() {
                             color: order.paymentMethod === 'Cash' ? '#166534' : order.paymentMethod === 'Card' ? '#1e40af' : '#92400e',
                           }}>
                             {order.paymentMethod}
+                          </span>
+                        )}
+                        {order.deliveryRequired && (
+                          <span style={{
+                            fontSize: 11,
+                            padding: '2px 8px',
+                            borderRadius: 20,
+                            background: '#f0fdf4',
+                            color: '#166534',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 3,
+                          }}
+                            title={order.deliveryAddress ? [order.deliveryAddress.street, order.deliveryAddress.city, order.deliveryAddress.province, order.deliveryAddress.postalCode].filter(Boolean).join(', ') : ''}
+                          >
+                            <Truck size={10} /> Delivery
+                          </span>
+                        )}
+                        {order.shippingCost > 0 && (
+                          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+                            +{fmt(order.shippingCost)} ship
                           </span>
                         )}
                         {order.shop && (

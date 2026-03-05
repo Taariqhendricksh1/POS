@@ -22,6 +22,7 @@ import {
   PackagePlus,
   PackageX,
   Percent,
+  Truck,
 } from 'lucide-react';
 import { orderApi, customerApi, productApi, settingsApi } from '../api';
 import { useToast } from '../hooks/useToast';
@@ -89,6 +90,15 @@ export default function NewSale() {
   const [discountItemId, setDiscountItemId] = useState(null);
   const [discountValue, setDiscountValue] = useState('');
   const invoiceRef = useRef(null);
+  // Shipping & Delivery
+  const [shippingCost, setShippingCost] = useState('');
+  const [deliveryRequired, setDeliveryRequired] = useState(false);
+  const [deliveryStreet, setDeliveryStreet] = useState('');
+  const [deliveryCity, setDeliveryCity] = useState('');
+  const [deliveryProvince, setDeliveryProvince] = useState('');
+  const [deliveryPostalCode, setDeliveryPostalCode] = useState('');
+  const [customerAddress, setCustomerAddress] = useState(null); // stored address from customer
+  const [useCustomerAddress, setUseCustomerAddress] = useState(true);
   const { showToast } = useToast();
 
   // Load shops from settings
@@ -174,6 +184,19 @@ export default function NewSale() {
     setClientPhone(customer.cellNumber || '');
     setCustomerSearch('');
     setSearchResults([]);
+    // Capture stored delivery address
+    const addr = customer.deliveryAddress;
+    if (addr && (addr.street || addr.city || addr.province || addr.postalCode)) {
+      setCustomerAddress(addr);
+      setDeliveryStreet(addr.street || '');
+      setDeliveryCity(addr.city || '');
+      setDeliveryProvince(addr.province || '');
+      setDeliveryPostalCode(addr.postalCode || '');
+      setUseCustomerAddress(true);
+    } else {
+      setCustomerAddress(null);
+      setUseCustomerAddress(false);
+    }
   };
 
   const handleStartSale = async (e) => {
@@ -359,12 +382,18 @@ export default function NewSale() {
     }
     setProcessing(true);
     try {
+      // Save delivery info if required
+      if (deliveryRequired) {
+        await orderApi.setDeliveryInfo(
+          order.id, true,
+          deliveryStreet, deliveryCity, deliveryProvince, deliveryPostalCode
+        );
+      }
       const res = await orderApi.complete(order.id, paymentMethod);
       setOrder(res.data);
       setStep(STEPS.SUCCESS);
-      setEmailStatus(null); // Will poll for status
+      setEmailStatus(null);
       showToast('Sale completed! Invoice sent.', 'success');
-      // Poll for email status
       pollEmailStatus(res.data.id);
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to complete order';
@@ -404,6 +433,14 @@ export default function NewSale() {
     setProductSearch('');
     setProductResults([]);
     setEmailStatus(null);
+    setShippingCost('');
+    setDeliveryRequired(false);
+    setDeliveryStreet('');
+    setDeliveryCity('');
+    setDeliveryProvince('');
+    setDeliveryPostalCode('');
+    setCustomerAddress(null);
+    setUseCustomerAddress(true);
   };
 
   const pollEmailStatus = async (orderId) => {
@@ -871,6 +908,33 @@ export default function NewSale() {
               <span>VAT ({order.taxRate}% incl.)</span>
               <span>R{order.taxAmount.toFixed(2)}</span>
             </div>
+
+            {/* Shipping Cost */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <Truck size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+              <span style={{ fontSize: 14, flex: 1 }}>Shipping</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: 120 }}>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>R</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={shippingCost}
+                  onChange={(e) => setShippingCost(e.target.value)}
+                  onBlur={async () => {
+                    const cost = parseFloat(shippingCost) || 0;
+                    try {
+                      const res = await orderApi.setShippingCost(order.id, cost);
+                      setOrder(res.data);
+                    } catch { showToast('Failed to update shipping', 'error'); }
+                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+                  style={{ width: '100%', padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: 13, textAlign: 'right' }}
+                />
+              </div>
+            </div>
+
             <div className="summary-row total">
               <span>Total</span>
               <span>R{order.total.toFixed(2)}</span>
@@ -936,10 +1000,92 @@ export default function NewSale() {
                 <span>R{item.lineTotal.toFixed(2)}</span>
               </div>
             ))}
+            {order?.shippingCost > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 14, color: 'var(--text-secondary)' }}>
+                <span>Shipping</span>
+                <span>R{order.shippingCost.toFixed(2)}</span>
+              </div>
+            )}
             <div className="summary-row total" style={{ marginTop: 12 }}>
               <span>Total</span>
               <span>R{order?.total.toFixed(2)}</span>
             </div>
+          </div>
+
+          {/* Delivery Section */}
+          <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius-sm)', padding: 16, marginBottom: 16 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+              <input
+                type="checkbox"
+                checked={deliveryRequired}
+                onChange={(e) => setDeliveryRequired(e.target.checked)}
+                style={{ width: 18, height: 18, accentColor: 'var(--primary)' }}
+              />
+              <Truck size={18} />
+              Delivery Required
+            </label>
+
+            {deliveryRequired && (
+              <div style={{ marginTop: 14 }}>
+                {/* If customer has a stored address, show toggle */}
+                {customerAddress && (
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                      <input
+                        type="checkbox"
+                        checked={useCustomerAddress}
+                        onChange={(e) => {
+                          setUseCustomerAddress(e.target.checked);
+                          if (e.target.checked) {
+                            setDeliveryStreet(customerAddress.street || '');
+                            setDeliveryCity(customerAddress.city || '');
+                            setDeliveryProvince(customerAddress.province || '');
+                            setDeliveryPostalCode(customerAddress.postalCode || '');
+                          } else {
+                            setDeliveryStreet('');
+                            setDeliveryCity('');
+                            setDeliveryProvince('');
+                            setDeliveryPostalCode('');
+                          }
+                        }}
+                        style={{ accentColor: 'var(--primary)' }}
+                      />
+                      Use customer's stored address
+                    </label>
+                    {useCustomerAddress && (
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 6, marginLeft: 26, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <MapPin size={12} />
+                        {[customerAddress.street, customerAddress.city, customerAddress.province, customerAddress.postalCode].filter(Boolean).join(', ')}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Address fields — show if no customer address or not using it */}
+                {(!customerAddress || !useCustomerAddress) && (
+                  <div>
+                    <div className="input-group" style={{ marginBottom: 8 }}>
+                      <label style={{ fontSize: 12 }}>Street Address</label>
+                      <input type="text" value={deliveryStreet} onChange={(e) => setDeliveryStreet(e.target.value)} placeholder="123 Main Street" />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <div className="input-group" style={{ marginBottom: 8 }}>
+                        <label style={{ fontSize: 12 }}>City</label>
+                        <input type="text" value={deliveryCity} onChange={(e) => setDeliveryCity(e.target.value)} placeholder="Cape Town" />
+                      </div>
+                      <div className="input-group" style={{ marginBottom: 8 }}>
+                        <label style={{ fontSize: 12 }}>Province</label>
+                        <input type="text" value={deliveryProvince} onChange={(e) => setDeliveryProvince(e.target.value)} placeholder="Western Cape" />
+                      </div>
+                    </div>
+                    <div className="input-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: 12 }}>Postal Code</label>
+                      <input type="text" value={deliveryPostalCode} onChange={(e) => setDeliveryPostalCode(e.target.value)} placeholder="8001" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
@@ -1091,10 +1237,27 @@ export default function NewSale() {
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
                 <span>VAT ({order?.taxRate}% incl.)</span><span>R{order?.taxAmount.toFixed(2)}</span>
               </div>
+              {order?.shippingCost > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                  <span>Shipping</span><span>R{order.shippingCost.toFixed(2)}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 4px', fontSize: 18, fontWeight: 700, borderTop: '2px solid #1a1a2e', marginTop: 8 }}>
                 <span>Total</span><span>R{order?.total.toFixed(2)}</span>
               </div>
             </div>
+            {/* Delivery info */}
+            {deliveryRequired && (
+              <div style={{ padding: '12px 20px', background: '#f0fdf4', borderTop: '1px solid #bbf7d0', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <Truck size={16} style={{ color: '#166534', flexShrink: 0, marginTop: 1 }} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13, color: '#166534' }}>Delivery Included</div>
+                  <div style={{ fontSize: 12, color: '#333', marginTop: 2 }}>
+                    {[deliveryStreet, deliveryCity, deliveryProvince, deliveryPostalCode].filter(Boolean).join(', ') || 'Address on file'}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Screenshot button */}

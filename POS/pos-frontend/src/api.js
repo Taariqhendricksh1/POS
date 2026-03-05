@@ -80,6 +80,10 @@ export const orderApi = {
   updateItemDiscount: (orderId, productId, discountPercentage) =>
     api.patch(`/orders/${orderId}/items/${productId}/discount`, { discountPercentage }),
   removeItem: (orderId, productId) => api.delete(`/orders/${orderId}/items/${productId}`),
+  setShippingCost: (orderId, shippingCost) =>
+    api.patch(`/orders/${orderId}/shipping`, { shippingCost }),
+  setDeliveryInfo: (orderId, deliveryRequired, street, city, province, postalCode) =>
+    api.patch(`/orders/${orderId}/delivery`, { deliveryRequired, street, city, province, postalCode }),
   complete: (orderId, paymentMethod) =>
     api.post(`/orders/${orderId}/complete`, { paymentMethod }),
   resendEmail: (orderId) => api.post(`/orders/${orderId}/resend-email`),

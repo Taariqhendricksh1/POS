@@ -257,8 +257,27 @@ public class EmailService
         if (order.DiscountTotal > 0)
             sb.AppendLine($"<div class='total-row'><span>Discount</span><span>-{currency}{order.DiscountTotal:N2}</span></div>");
         sb.AppendLine($"<div class='total-row'><span>VAT ({order.TaxRate}% incl.)</span><span>{currency}{order.TaxAmount:N2}</span></div>");
+        if (order.ShippingCost > 0)
+            sb.AppendLine($"<div class='total-row'><span>Shipping</span><span>{currency}{order.ShippingCost:N2}</span></div>");
         sb.AppendLine($"<div class='total-row grand'><span>Total</span><span>{currency}{order.Total:N2}</span></div>");
         sb.AppendLine("</div>");
+
+        // Delivery info section
+        if (order.DeliveryRequired && order.DeliveryAddress != null)
+        {
+            var addr = order.DeliveryAddress;
+            var addressParts = new[] { addr.Street, addr.City, addr.Province, addr.PostalCode }
+                .Where(p => !string.IsNullOrWhiteSpace(p));
+            var fullAddress = string.Join(", ", addressParts);
+            sb.AppendLine(@"<div style='padding: 16px 30px; background: #f0fdf4; border-top: 1px solid #bbf7d0;'>
+                <div style='display: flex; align-items: center; gap: 8px; margin-bottom: 6px;'>
+                    <span style='font-size: 16px;'>📦</span>
+                    <strong style='font-size: 14px; color: #166534;'>Delivery Included</strong>
+                </div>");
+            if (!string.IsNullOrEmpty(fullAddress))
+                sb.AppendLine($"<div style='font-size: 13px; color: #333; margin-left: 24px;'>{fullAddress}</div>");
+            sb.AppendLine("</div>");
+        }
 
         if (!isPaid)
         {
@@ -296,8 +315,19 @@ public class EmailService
         if (order.DiscountTotal > 0)
             sb.AppendLine($"Discount: -{currency}{order.DiscountTotal:N2}");
         sb.AppendLine($"VAT ({order.TaxRate}%): {currency}{order.TaxAmount:N2}");
+        if (order.ShippingCost > 0)
+            sb.AppendLine($"Shipping: {currency}{order.ShippingCost:N2}");
         sb.AppendLine($"TOTAL: {currency}{order.Total:N2}");
         sb.AppendLine();
+        if (order.DeliveryRequired && order.DeliveryAddress != null)
+        {
+            var addr = order.DeliveryAddress;
+            var parts = new[] { addr.Street, addr.City, addr.Province, addr.PostalCode }
+                .Where(p => !string.IsNullOrWhiteSpace(p));
+            sb.AppendLine("DELIVERY INCLUDED");
+            sb.AppendLine($"Address: {string.Join(", ", parts)}");
+            sb.AppendLine();
+        }
         sb.AppendLine($"STATUS: {(isPaid ? "PAID" : "PAYMENT REQUIRED")}");
         if (!isPaid)
         {
