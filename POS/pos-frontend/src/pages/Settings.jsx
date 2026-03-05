@@ -199,23 +199,21 @@ export default function SettingsPage() {
 
           <div style={fieldStyle}>
             <label style={labelStyle}>Add Shop</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                style={{ ...inputStyle, flex: 1 }}
-                value={newShop}
-                onChange={e => setNewShop(e.target.value)}
-                placeholder="Enter shop name..."
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addShop(); } }}
-              />
-              <button
-                type="button"
-                onClick={addShop}
-                className="btn btn-primary"
-                style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', fontSize: 14 }}
-              >
-                <Plus size={16} /> Add
-              </button>
-            </div>
+            <input
+              style={{ ...inputStyle, marginBottom: 8 }}
+              value={newShop}
+              onChange={e => setNewShop(e.target.value)}
+              placeholder="Enter shop name..."
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addShop(); } }}
+            />
+            <button
+              type="button"
+              onClick={addShop}
+              className="btn btn-primary"
+              style={{ width: '100%', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 14 }}
+            >
+              <Plus size={16} /> Add Shop
+            </button>
           </div>
 
           {settings.shops.length === 0 ? (
