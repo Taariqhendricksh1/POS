@@ -91,6 +91,24 @@ public class OrdersController : ControllerBase
         return Ok(new { message = "Invoice email sent successfully" });
     }
 
+    [HttpPost("{id}/eft-payment-received")]
+    public async Task<ActionResult<Order>> MarkEftPaymentReceived(string id)
+    {
+        var order = await _orderService.MarkEftPaymentReceivedAsync(id);
+        if (order == null)
+            return BadRequest(new { message = "Order not found, not completed, not EFT, or already marked as received." });
+        return Ok(order);
+    }
+
+    [HttpPost("{id}/send-payment-reminder")]
+    public async Task<ActionResult> SendPaymentReminder(string id)
+    {
+        var result = await _orderService.SendPaymentReminderAsync(id);
+        if (result == null) return BadRequest(new { message = "Order not found, not EFT, or payment already received." });
+        if (result == false) return BadRequest(new { message = "Failed to send reminder email. Check server logs." });
+        return Ok(new { message = "Payment reminder sent successfully" });
+    }
+
     [HttpPost("{id}/cancel")]
     public async Task<ActionResult<Order>> CancelOrder(string id)
     {

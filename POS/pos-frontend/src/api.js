@@ -81,6 +81,8 @@ export const orderApi = {
   complete: (orderId, paymentMethod) =>
     api.post(`/orders/${orderId}/complete`, { paymentMethod }),
   resendEmail: (orderId) => api.post(`/orders/${orderId}/resend-email`),
+  markEftPaymentReceived: (orderId) => api.post(`/orders/${orderId}/eft-payment-received`),
+  sendPaymentReminder: (orderId) => api.post(`/orders/${orderId}/send-payment-reminder`),
   cancel: (orderId) => api.post(`/orders/${orderId}/cancel`),
   delete: (orderId) => api.delete(`/orders/${orderId}`),
 };

@@ -62,6 +62,12 @@ public class Order
 
     [BsonElement("emailError")]
     public string? EmailError { get; set; }
+
+    [BsonElement("eftPaymentReceived")]
+    public bool EftPaymentReceived { get; set; }
+
+    [BsonElement("eftPaymentReceivedAt")]
+    public DateTime? EftPaymentReceivedAt { get; set; }
 }
 
 public class OrderItem

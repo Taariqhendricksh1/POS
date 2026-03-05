@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { History, Receipt, Search, CheckCircle2, Trash2, CreditCard, Banknote, Building2, X, Lock, Store } from 'lucide-react';
+import { History, Receipt, Search, CheckCircle2, Trash2, CreditCard, Banknote, Building2, X, Lock, Store, Send, DollarSign, Clock } from 'lucide-react';
 import { orderApi } from '../api';
 import { useToast } from '../hooks/useToast';
 
@@ -8,6 +8,8 @@ export default function OrderHistory() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [markingPayment, setMarkingPayment] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
   const [completing, setCompleting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(null);
@@ -94,6 +96,36 @@ export default function OrderHistory() {
 
   const isPending = (order) => order.status === 'Pending';
   const isCompleted = (order) => order.status === 'Completed';
+  const isEftUnpaid = (order) => isCompleted(order) && order.paymentMethod === 'EFT' && !order.eftPaymentReceived;
+  const isEftPaid = (order) => isCompleted(order) && order.paymentMethod === 'EFT' && order.eftPaymentReceived;
+
+  const handleMarkEftPayment = async (order) => {
+    setMarkingPayment(true);
+    try {
+      const res = await orderApi.markEftPaymentReceived(order.id);
+      showToast(`${order.invoiceNumber} marked as paid — receipt emailed to ${order.clientEmail}`, 'success');
+      setSelectedOrder(res.data);
+      loadOrders();
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to mark payment';
+      showToast(msg, 'error');
+    } finally {
+      setMarkingPayment(false);
+    }
+  };
+
+  const handleSendReminder = async (order) => {
+    setSendingReminder(true);
+    try {
+      await orderApi.sendPaymentReminder(order.id);
+      showToast(`Payment reminder sent to ${order.clientEmail}`, 'success');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to send reminder';
+      showToast(msg, 'error');
+    } finally {
+      setSendingReminder(false);
+    }
+  };
 
   return (
     <div>
@@ -143,6 +175,11 @@ export default function OrderHistory() {
               <span className={`badge ${getStatusBadge(order.status)}`}>
                 {order.status}
               </span>
+              {isEftUnpaid(order) && (
+                <div style={{ marginTop: 2 }}>
+                  <span className="badge badge-warning" style={{ fontSize: 9 }}>EFT UNPAID</span>
+                </div>
+              )}
             </div>
           </div>
         ))
@@ -291,6 +328,39 @@ export default function OrderHistory() {
                     )}
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* EFT Payment Actions */}
+            {isEftUnpaid(selectedOrder) && (
+              <div style={{ marginTop: 16, padding: 16, background: '#fef3c7', borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, fontWeight: 600, fontSize: 14, color: '#92400e' }}>
+                  <Clock size={16} /> EFT Payment Outstanding
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    className="btn btn-success"
+                    onClick={() => handleMarkEftPayment(selectedOrder)}
+                    disabled={markingPayment}
+                    style={{ flex: 1 }}
+                  >
+                    {markingPayment ? <><span className="spinner" /> Processing...</> : <><DollarSign size={16} /> Payment Received</>}
+                  </button>
+                  <button
+                    className="btn btn-outline"
+                    onClick={() => handleSendReminder(selectedOrder)}
+                    disabled={sendingReminder}
+                    style={{ flex: 1 }}
+                  >
+                    {sendingReminder ? <><span className="spinner" /> Sending...</> : <><Send size={16} /> Send Reminder</>}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {isEftPaid(selectedOrder) && (
+              <div style={{ marginTop: 16, textAlign: 'center', color: 'var(--success, #16a34a)', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#dcfce7', padding: 12, borderRadius: 'var(--radius-sm)' }}>
+                <DollarSign size={14} /> EFT Payment received {selectedOrder.eftPaymentReceivedAt ? `on ${formatDate(selectedOrder.eftPaymentReceivedAt)}` : ''}
               </div>
             )}
 

@@ -29,9 +29,13 @@ public class EmailService
     {
         _logger.LogInformation("Sending invoice email for {InvoiceNumber} to {Email}", order.InvoiceNumber, order.ClientEmail);
 
-        var htmlBody = GenerateInvoiceHtml(order);
-        var textBody = GenerateInvoicePlainText(order);
-        var subject = $"Invoice {order.InvoiceNumber} - {_appSettings.CompanyName}";
+        var isPaidInvoice = order.PaymentMethod != PaymentMethod.EFT || order.EftPaymentReceived;
+        var htmlBody = GenerateInvoiceHtml(order, isPaidInvoice);
+        var textBody = GenerateInvoicePlainText(order, isPaidInvoice);
+        var statusLabel = isPaidInvoice ? "PAID" : "PAYMENT REQUIRED";
+        var subject = isPaidInvoice
+            ? $"Invoice {order.InvoiceNumber} - {_appSettings.CompanyName}"
+            : $"Invoice {order.InvoiceNumber} — Payment Required - {_appSettings.CompanyName}";
 
         // Use Brevo HTTP API if ApiKey is configured (works on Render free tier)
         if (!string.IsNullOrEmpty(_emailSettings.ApiKey))
@@ -44,6 +48,71 @@ public class EmailService
         }
 
         _logger.LogInformation("Invoice email sent successfully for {InvoiceNumber}", order.InvoiceNumber);
+    }
+
+    public async Task SendEftPaymentReceivedEmailAsync(Order order)
+    {
+        _logger.LogInformation("Sending EFT payment received email for {InvoiceNumber} to {Email}", order.InvoiceNumber, order.ClientEmail);
+
+        var htmlBody = GenerateInvoiceHtml(order, isPaid: true);
+        var textBody = GenerateInvoicePlainText(order, isPaid: true);
+        var subject = $"Payment Received — Invoice {order.InvoiceNumber} - {_appSettings.CompanyName}";
+
+        if (!string.IsNullOrEmpty(_emailSettings.ApiKey))
+            await SendViaBrevoApiAsync(order, subject, htmlBody, textBody);
+        else
+            await SendViaSmtpAsync(order, subject, htmlBody, textBody);
+
+        _logger.LogInformation("EFT payment received email sent for {InvoiceNumber}", order.InvoiceNumber);
+    }
+
+    public async Task SendPaymentReminderEmailAsync(Order order)
+    {
+        _logger.LogInformation("Sending payment reminder for {InvoiceNumber} to {Email}", order.InvoiceNumber, order.ClientEmail);
+
+        var currency = _appSettings.CurrencySymbol;
+        var htmlBody = $@"
+            <!DOCTYPE html><html><head><meta charset='utf-8'/>
+            <meta name='viewport' content='width=device-width, initial-scale=1.0'/>
+            <style>
+                body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }}
+                .card {{ max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }}
+                .header {{ background: #f59e0b; color: white; padding: 30px; text-align: center; }}
+                .header h1 {{ margin: 0; font-size: 24px; }}
+                .header p {{ margin: 5px 0 0; opacity: 0.9; }}
+                .body {{ padding: 30px; }}
+                .amount {{ font-size: 32px; font-weight: 700; color: #1a1a2e; text-align: center; margin: 20px 0; }}
+                .footer {{ padding: 20px 30px; text-align: center; color: #888; font-size: 12px; border-top: 1px solid #eee; }}
+            </style></head><body>
+            <div class='card'>
+                <div class='header'>
+                    <h1>Payment Reminder</h1>
+                    <p>{_appSettings.CompanyName}</p>
+                </div>
+                <div class='body'>
+                    <p>Hi {order.ClientName},</p>
+                    <p>This is a friendly reminder that payment is still outstanding for the following invoice:</p>
+                    <p><strong>Invoice:</strong> {order.InvoiceNumber}<br/>
+                    <strong>Date:</strong> {order.CompletedAt?.ToString("dd MMM yyyy") ?? order.CreatedAt.ToString("dd MMM yyyy")}<br/>
+                    <strong>Payment Method:</strong> EFT</p>
+                    <div class='amount'>{currency}{order.Total:N2}</div>
+                    <p>Please arrange payment at your earliest convenience. If you have already made the payment, please disregard this reminder.</p>
+                    <p>Thank you,<br/>{_appSettings.CompanyName}</p>
+                </div>
+                <div class='footer'>
+                    {(string.IsNullOrEmpty(_appSettings.CompanyPhone) ? "" : $"<p>{_appSettings.CompanyPhone} | {_appSettings.CompanyEmail}</p>")}
+                </div>
+            </div></body></html>";
+
+        var textBody = $"PAYMENT REMINDER\n\nInvoice: {order.InvoiceNumber}\nAmount Due: {currency}{order.Total:N2}\n\nPlease arrange payment at your earliest convenience.\n\nThank you,\n{_appSettings.CompanyName}";
+        var subject = $"Payment Reminder — Invoice {order.InvoiceNumber} - {_appSettings.CompanyName}";
+
+        if (!string.IsNullOrEmpty(_emailSettings.ApiKey))
+            await SendViaBrevoApiAsync(order, subject, htmlBody, textBody);
+        else
+            await SendViaSmtpAsync(order, subject, htmlBody, textBody);
+
+        _logger.LogInformation("Payment reminder sent for {InvoiceNumber}", order.InvoiceNumber);
     }
 
     private async Task SendViaBrevoApiAsync(Order order, string subject, string htmlBody, string textBody)
@@ -111,10 +180,12 @@ public class EmailService
         await client.DisconnectAsync(true);
     }
 
-    private string GenerateInvoiceHtml(Order order)
+    private string GenerateInvoiceHtml(Order order, bool isPaid = true)
     {
         var currency = _appSettings.CurrencySymbol;
         var sb = new StringBuilder();
+        var statusBadge = isPaid ? "PAID" : "PAYMENT REQUIRED";
+        var badgeColor = isPaid ? "#16c784" : "#f59e0b";
 
         sb.AppendLine(@"<!DOCTYPE html><html><head><meta charset='utf-8'/>
         <meta name='viewport' content='width=device-width, initial-scale=1.0'/>
@@ -145,7 +216,7 @@ public class EmailService
         sb.AppendLine($"<div class='header'><h1>{_appSettings.CompanyName}</h1>");
         if (!string.IsNullOrEmpty(_appSettings.CompanyAddress))
             sb.AppendLine($"<p>{_appSettings.CompanyAddress}</p>");
-        sb.AppendLine($"<span class='badge'>PAID</span></div>");
+        sb.AppendLine($"<span class='badge' style='background: {badgeColor};'>{statusBadge}</span></div>");
 
         sb.AppendLine("<div class='details'><div class='details-grid'>");
         sb.AppendLine($"<div class='detail-item'><label>Invoice</label><span>{order.InvoiceNumber}</span></div>");
@@ -176,7 +247,10 @@ public class EmailService
         sb.AppendLine($"<div class='total-row grand'><span>Total</span><span>{currency}{order.Total:N2}</span></div>");
         sb.AppendLine("</div>");
 
-        sb.AppendLine($"<div class='footer'><p>Thank you for your purchase!</p>");
+        if (!isPaid)
+            sb.AppendLine("<div style='padding: 15px 30px; background: #fef3c7; color: #92400e; text-align: center; font-weight: 600; font-size: 14px;'>Payment is required via EFT. Please arrange payment at your earliest convenience.</div>");
+
+        sb.AppendLine($"<div class='footer'><p>{(isPaid ? "Thank you for your purchase!" : "Thank you — we look forward to receiving your payment.")}</p>");
         if (!string.IsNullOrEmpty(_appSettings.CompanyPhone))
             sb.AppendLine($"<p>{_appSettings.CompanyPhone} | {_appSettings.CompanyEmail}</p>");
         sb.AppendLine("</div></div></body></html>");
@@ -184,7 +258,7 @@ public class EmailService
         return sb.ToString();
     }
 
-    private string GenerateInvoicePlainText(Order order)
+    private string GenerateInvoicePlainText(Order order, bool isPaid = true)
     {
         var currency = _appSettings.CurrencySymbol;
         var sb = new StringBuilder();
@@ -206,8 +280,10 @@ public class EmailService
         sb.AppendLine($"VAT ({order.TaxRate}%): {currency}{order.TaxAmount:N2}");
         sb.AppendLine($"TOTAL: {currency}{order.Total:N2}");
         sb.AppendLine();
-        sb.AppendLine($"STATUS: PAID");
-        sb.AppendLine($"Thank you for your purchase from {_appSettings.CompanyName}!");
+        sb.AppendLine($"STATUS: {(isPaid ? "PAID" : "PAYMENT REQUIRED")}");
+        if (!isPaid)
+            sb.AppendLine($"Please arrange EFT payment at your earliest convenience.");
+        sb.AppendLine($"Thank you from {_appSettings.CompanyName}!");
 
         return sb.ToString();
     }

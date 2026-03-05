@@ -189,6 +189,53 @@ public class OrderService
         return order;
     }
 
+    public async Task<Order?> MarkEftPaymentReceivedAsync(string orderId)
+    {
+        var order = await _orders.Find(o => o.Id == orderId).FirstOrDefaultAsync();
+        if (order == null || order.Status != OrderStatus.Completed) return null;
+        if (order.PaymentMethod != PaymentMethod.EFT) return null;
+        if (order.EftPaymentReceived) return order; // Already marked
+
+        order.EftPaymentReceived = true;
+        order.EftPaymentReceivedAt = DateTime.UtcNow;
+        await _orders.ReplaceOneAsync(o => o.Id == orderId, order);
+
+        // Send paid invoice email (fire and forget)
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _emailService.SendEftPaymentReceivedEmailAsync(order);
+                _logger.LogInformation("EFT payment received email sent for {InvoiceNumber}", order.InvoiceNumber);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to send EFT payment received email for {InvoiceNumber}", order.InvoiceNumber);
+            }
+        });
+
+        return order;
+    }
+
+    public async Task<bool?> SendPaymentReminderAsync(string orderId)
+    {
+        var order = await _orders.Find(o => o.Id == orderId).FirstOrDefaultAsync();
+        if (order == null || order.Status != OrderStatus.Completed) return null;
+        if (order.PaymentMethod != PaymentMethod.EFT || order.EftPaymentReceived) return null;
+
+        try
+        {
+            await _emailService.SendPaymentReminderEmailAsync(order);
+            _logger.LogInformation("Payment reminder sent for {InvoiceNumber}", order.InvoiceNumber);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send payment reminder for {InvoiceNumber}", order.InvoiceNumber);
+            return false;
+        }
+    }
+
     public async Task<bool?> ResendInvoiceEmailAsync(string orderId)
     {
         var order = await _orders.Find(o => o.Id == orderId).FirstOrDefaultAsync();
@@ -270,6 +317,10 @@ public class OrderService
                 .GroupBy(x => x.order.PaymentMethod)
                 .ToDictionary(g => g.Key.ToString(), g => g.Sum(x => x.items.Sum(i => i.LineTotal)));
 
+            var eftOrdersShop = filteredOrders.Where(x => x.order.PaymentMethod == PaymentMethod.EFT).ToList();
+            var eftOutstandingShop = eftOrdersShop.Where(x => !x.order.EftPaymentReceived).ToList();
+            var eftReceivedShop = eftOrdersShop.Where(x => x.order.EftPaymentReceived).ToList();
+
             return new SalesSummary
             {
                 From = from,
@@ -280,7 +331,11 @@ public class OrderService
                 TotalDiscount = totalDiscountShop,
                 TotalTax = totalTaxShop,
                 AverageOrderValue = avgShop,
-                PaymentBreakdown = paymentBreakdownShop
+                PaymentBreakdown = paymentBreakdownShop,
+                EftOutstandingCount = eftOutstandingShop.Count,
+                EftOutstandingTotal = eftOutstandingShop.Sum(x => x.items.Sum(i => i.LineTotal)),
+                EftReceivedCount = eftReceivedShop.Count,
+                EftReceivedTotal = eftReceivedShop.Sum(x => x.items.Sum(i => i.LineTotal))
             };
         }
 
@@ -295,6 +350,10 @@ public class OrderService
             .GroupBy(o => o.PaymentMethod)
             .ToDictionary(g => g.Key.ToString(), g => g.Sum(o => o.Total));
 
+        var eftOrders = orders.Where(o => o.PaymentMethod == PaymentMethod.EFT).ToList();
+        var eftOutstanding = eftOrders.Where(o => !o.EftPaymentReceived).ToList();
+        var eftReceived = eftOrders.Where(o => o.EftPaymentReceived).ToList();
+
         return new SalesSummary
         {
             From = from,
@@ -305,7 +364,11 @@ public class OrderService
             TotalDiscount = totalDiscount,
             TotalTax = totalTax,
             AverageOrderValue = averageOrderValue,
-            PaymentBreakdown = paymentBreakdown
+            PaymentBreakdown = paymentBreakdown,
+            EftOutstandingCount = eftOutstanding.Count,
+            EftOutstandingTotal = eftOutstanding.Sum(o => o.Total),
+            EftReceivedCount = eftReceived.Count,
+            EftReceivedTotal = eftReceived.Sum(o => o.Total)
         };
     }
 

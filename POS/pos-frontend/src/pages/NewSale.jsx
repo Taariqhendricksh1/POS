@@ -19,6 +19,7 @@ import {
   Phone,
   Mail,
   MapPin,
+  PackagePlus,
 } from 'lucide-react';
 import { orderApi, customerApi, productApi } from '../api';
 import { useToast } from '../hooks/useToast';
@@ -69,6 +70,13 @@ export default function NewSale() {
   // Email status
   const [emailStatus, setEmailStatus] = useState(null); // null=pending, true=sent, false=failed
   const [resending, setResending] = useState(false);
+  // Quick add product
+  const [showAddProduct, setShowAddProduct] = useState(false);
+  const [addProductBarcode, setAddProductBarcode] = useState('');
+  const [addProductName, setAddProductName] = useState('');
+  const [addProductPrice, setAddProductPrice] = useState('');
+  const [addProductStock, setAddProductStock] = useState('1');
+  const [addingProduct, setAddingProduct] = useState(false);
   const { showToast } = useToast();
 
   // Debounced customer search
@@ -120,10 +128,14 @@ export default function NewSale() {
       setOrder(res.data);
       setProductSearch('');
       setProductResults([]);
+      setShowAddProduct(false);
       showToast('Item added!', 'success');
     } catch (err) {
       const msg = err.response?.data?.message || 'Product not found or out of stock';
       showToast(msg, 'error');
+      // Offer to add the product
+      setAddProductBarcode(barcode);
+      setShowAddProduct(true);
     }
   };
 
@@ -194,13 +206,53 @@ export default function NewSale() {
         const res = await orderApi.addItem(order.id, barcode);
         setOrder(res.data);
         showToast('Item added!', 'success');
+        setShowAddProduct(false);
       } catch (err) {
         const msg = err.response?.data?.message || 'Product not found or out of stock';
         showToast(msg, 'error');
+        setAddProductBarcode(barcode);
+        setShowAddProduct(true);
       }
     },
     [order, showToast]
   );
+
+  const handleQuickAddProduct = async (e) => {
+    e.preventDefault();
+    setAddingProduct(true);
+    try {
+      await productApi.create({
+        barcode: addProductBarcode,
+        name: addProductName,
+        sellingPrice: parseFloat(addProductPrice),
+        quantityInStock: parseInt(addProductStock) || 1,
+        category: '',
+        shop: '',
+        costPrice: 0,
+        description: '',
+        reorderLevel: 5,
+      });
+      showToast(`${addProductName} added to inventory`, 'success');
+      // Now add it to the order
+      try {
+        const res = await orderApi.addItem(order.id, addProductBarcode);
+        setOrder(res.data);
+        showToast('Item added to order!', 'success');
+      } catch {
+        showToast('Product saved but could not add to order — try scanning again', 'warning');
+      }
+      setShowAddProduct(false);
+      setAddProductBarcode('');
+      setAddProductName('');
+      setAddProductPrice('');
+      setAddProductStock('1');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to create product';
+      showToast(msg, 'error');
+    } finally {
+      setAddingProduct(false);
+    }
+  };
 
   const handleUpdateQty = async (productId, newQty) => {
     if (!order) return;
@@ -528,6 +580,41 @@ export default function NewSale() {
         {showScanner && (
           <div style={{ marginBottom: 16 }}>
             <BarcodeScanner onScan={handleScanProduct} continuous />
+          </div>
+        )}
+
+        {/* Quick Add Product (shown when scan/search fails) */}
+        {showAddProduct && (
+          <div className="card" style={{ padding: 16, marginBottom: 16, border: '2px solid var(--warning, #f59e0b)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <PackagePlus size={16} /> Product Not Found — Add It
+              </h3>
+              <button onClick={() => setShowAddProduct(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
+            </div>
+            <form onSubmit={handleQuickAddProduct}>
+              <div className="input-group">
+                <label>Barcode</label>
+                <input type="text" value={addProductBarcode} onChange={(e) => setAddProductBarcode(e.target.value)} required />
+              </div>
+              <div className="input-group">
+                <label>Product Name *</label>
+                <input type="text" value={addProductName} onChange={(e) => setAddProductName(e.target.value)} placeholder="Product name" required autoFocus />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="input-group">
+                  <label>Selling Price (R) *</label>
+                  <input type="number" step="0.01" min="0" value={addProductPrice} onChange={(e) => setAddProductPrice(e.target.value)} placeholder="0.00" required />
+                </div>
+                <div className="input-group">
+                  <label>Stock Qty</label>
+                  <input type="number" min="1" value={addProductStock} onChange={(e) => setAddProductStock(e.target.value)} />
+                </div>
+              </div>
+              <button type="submit" className="btn btn-success" disabled={addingProduct}>
+                {addingProduct ? <><span className="spinner" /> Saving...</> : <><PackagePlus size={16} /> Add Product & Add to Order</>}
+              </button>
+            </form>
           </div>
         )}
 

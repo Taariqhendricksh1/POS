@@ -16,6 +16,8 @@ import {
   Building2,
   BarChart3,
   Receipt,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import { productApi, orderApi } from '../api';
 
@@ -308,6 +310,37 @@ export default function Dashboard() {
                   <span>VAT (incl.)</span>
                   <span>R{salesSummary.totalTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
+              </div>
+            )}
+
+            {/* EFT Payment Status */}
+            {(salesSummary.eftOutstandingCount > 0 || salesSummary.eftReceivedCount > 0) && (
+              <div className="card" style={{ padding: 16, marginTop: 12 }}>
+                <h4 style={{ fontSize: 12, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Building2 size={14} /> EFT Payment Status
+                </h4>
+                {salesSummary.eftOutstandingCount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#fef3c7', borderRadius: 'var(--radius-sm)', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#92400e' }}>
+                      <Clock size={16} />
+                      <span><strong>{salesSummary.eftOutstandingCount}</strong> Outstanding</span>
+                    </div>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: '#92400e' }}>
+                      R{salesSummary.eftOutstandingTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                {salesSummary.eftReceivedCount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#dcfce7', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#166534' }}>
+                      <CheckCircle2 size={16} />
+                      <span><strong>{salesSummary.eftReceivedCount}</strong> Received</span>
+                    </div>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: '#166534' }}>
+                      R{salesSummary.eftReceivedTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

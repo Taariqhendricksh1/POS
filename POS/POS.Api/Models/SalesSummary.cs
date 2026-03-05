@@ -11,4 +11,9 @@ public class SalesSummary
     public decimal TotalTax { get; set; }
     public decimal AverageOrderValue { get; set; }
     public Dictionary<string, decimal> PaymentBreakdown { get; set; } = new();
+    // EFT outstanding info
+    public int EftOutstandingCount { get; set; }
+    public decimal EftOutstandingTotal { get; set; }
+    public int EftReceivedCount { get; set; }
+    public decimal EftReceivedTotal { get; set; }
 }
