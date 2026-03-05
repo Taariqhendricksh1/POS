@@ -69,7 +69,7 @@ public class OrderService
         var order = await _orders.Find(o => o.Id == orderId).FirstOrDefaultAsync();
         if (order == null || order.Status != OrderStatus.Pending) return AddItemResult.OrderInvalid();
 
-        var product = await _productService.GetByBarcodeAsync(barcode);
+        var product = await _productService.GetByBarcodeOrSkuAsync(barcode);
         if (product == null || !product.IsActive) return AddItemResult.NotFound();
 
         if (product.QuantityInStock <= 0) return AddItemResult.OutOfStock(product);

@@ -80,6 +80,7 @@ export default function NewSale() {
   const [addProductPrice, setAddProductPrice] = useState('');
   const [addProductStock, setAddProductStock] = useState('1');
   const [addProductShop, setAddProductShop] = useState('');
+  const [addProductSku, setAddProductSku] = useState('');
   const [addingProduct, setAddingProduct] = useState(false);
   const [shops, setShops] = useState([]);
   // Out of stock
@@ -280,6 +281,10 @@ export default function NewSale() {
 
   const handleQuickAddProduct = async (e) => {
     e.preventDefault();
+    if (!addProductBarcode && !addProductSku) {
+      showToast('Either barcode or SKU is required', 'error');
+      return;
+    }
     setAddingProduct(true);
     try {
       await productApi.create({
@@ -289,14 +294,16 @@ export default function NewSale() {
         quantityInStock: parseInt(addProductStock) || 1,
         category: '',
         shop: addProductShop,
+        sku: addProductSku,
         costPrice: 0,
         description: '',
         reorderLevel: 5,
       });
       showToast(`${addProductName} added to inventory`, 'success');
-      // Now add it to the order
+      // Now add it to the order using barcode or SKU
+      const identifier = addProductBarcode || addProductSku;
       try {
-        const res = await orderApi.addItem(order.id, addProductBarcode);
+        const res = await orderApi.addItem(order.id, identifier);
         setOrder(res.data);
         showToast('Item added to order!', 'success');
       } catch {
@@ -308,6 +315,7 @@ export default function NewSale() {
       setAddProductPrice('');
       setAddProductStock('1');
       setAddProductShop('');
+      setAddProductSku('');
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to create product';
       showToast(msg, 'error');
@@ -744,8 +752,12 @@ export default function NewSale() {
             </div>
             <form onSubmit={handleQuickAddProduct}>
               <div className="input-group">
-                <label>Barcode</label>
-                <input type="text" value={addProductBarcode} onChange={(e) => setAddProductBarcode(e.target.value)} required />
+                <label>Barcode <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 400 }}>(optional if SKU provided)</span></label>
+                <input type="text" value={addProductBarcode} onChange={(e) => setAddProductBarcode(e.target.value)} />
+              </div>
+              <div className="input-group">
+                <label>SKU {!addProductBarcode ? '*' : ''}</label>
+                <input type="text" value={addProductSku} onChange={(e) => setAddProductSku(e.target.value)} placeholder="SKU code" required={!addProductBarcode} />
               </div>
               <div className="input-group">
                 <label>Product Name *</label>

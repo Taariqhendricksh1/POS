@@ -15,9 +15,18 @@ public class ProductService
         var database = client.GetDatabase(settings.Value.DatabaseName);
         _products = database.GetCollection<Product>("products");
 
-        // Create index on barcode for fast lookups
-        var indexKeys = Builders<Product>.IndexKeys.Ascending(p => p.Barcode);
-        _products.Indexes.CreateOne(new CreateIndexModel<Product>(indexKeys, new CreateIndexOptions { Unique = true }));
+        // Drop old unique barcode index if it exists, replace with sparse index
+        try { _products.Indexes.DropOne("Barcode_1"); } catch { /* index may not exist */ }
+
+        // Create sparse index on barcode (allows multiple empty/null barcodes)
+        var barcodeIndex = Builders<Product>.IndexKeys.Ascending(p => p.Barcode);
+        _products.Indexes.CreateOne(new CreateIndexModel<Product>(barcodeIndex,
+            new CreateIndexOptions { Sparse = true }));
+
+        // Create index on SKU for fast lookups
+        var skuIndex = Builders<Product>.IndexKeys.Ascending(p => p.Sku);
+        _products.Indexes.CreateOne(new CreateIndexModel<Product>(skuIndex,
+            new CreateIndexOptions { Sparse = true }));
     }
 
     public async Task<List<Product>> GetAllAsync(string? shop = null)
@@ -41,7 +50,15 @@ public class ProductService
         await _products.Find(p => p.Id == id).FirstOrDefaultAsync();
 
     public async Task<Product?> GetByBarcodeAsync(string barcode) =>
+        string.IsNullOrEmpty(barcode) ? null :
         await _products.Find(p => p.Barcode == barcode).FirstOrDefaultAsync();
+
+    public async Task<Product?> GetBySkuAsync(string sku) =>
+        string.IsNullOrEmpty(sku) ? null :
+        await _products.Find(p => p.Sku == sku).FirstOrDefaultAsync();
+
+    public async Task<Product?> GetByBarcodeOrSkuAsync(string identifier) =>
+        await GetByBarcodeAsync(identifier) ?? await GetBySkuAsync(identifier);
 
     public async Task<List<Product>> SearchAsync(string query, string? shop = null)
     {

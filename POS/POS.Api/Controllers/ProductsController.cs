@@ -42,8 +42,8 @@ public class ProductsController : ControllerBase
     [HttpGet("barcode/{barcode}")]
     public async Task<ActionResult<Product>> GetByBarcode(string barcode)
     {
-        var product = await _productService.GetByBarcodeAsync(barcode);
-        if (product == null) return NotFound(new { message = "Product not found for this barcode" });
+        var product = await _productService.GetByBarcodeOrSkuAsync(barcode);
+        if (product == null) return NotFound(new { message = "Product not found for this barcode/SKU" });
         return Ok(product);
     }
 
@@ -78,10 +78,27 @@ public class ProductsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<Product>> Create([FromBody] Product product)
     {
-        // Check if barcode already exists
-        var existing = await _productService.GetByBarcodeAsync(product.Barcode);
-        if (existing != null)
-            return Conflict(new { message = "A product with this barcode already exists", product = existing });
+        // Require at least barcode or SKU
+        var hasBarcode = !string.IsNullOrWhiteSpace(product.Barcode);
+        var hasSku = !string.IsNullOrWhiteSpace(product.Sku);
+        if (!hasBarcode && !hasSku)
+            return BadRequest(new { message = "Either barcode or SKU is required." });
+
+        // Check barcode uniqueness if provided
+        if (hasBarcode)
+        {
+            var existingByBarcode = await _productService.GetByBarcodeAsync(product.Barcode);
+            if (existingByBarcode != null)
+                return Conflict(new { message = "A product with this barcode already exists", product = existingByBarcode });
+        }
+
+        // Check SKU uniqueness if provided
+        if (hasSku)
+        {
+            var existingBySku = await _productService.GetBySkuAsync(product.Sku);
+            if (existingBySku != null)
+                return Conflict(new { message = "A product with this SKU already exists" });
+        }
 
         var created = await _productService.CreateAsync(product);
         return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);

@@ -246,6 +246,10 @@ export default function Inventory() {
   // --- Submit ---
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.barcode && !formData.sku) {
+      showToast('Either barcode or SKU is required', 'error');
+      return;
+    }
     const payload = {
       ...formData,
       costPrice: parseFloat(formData.costPrice) || 0,
@@ -533,15 +537,14 @@ export default function Inventory() {
 
             <form onSubmit={handleSubmit}>
               <div className="input-group">
-                <label>Barcode *</label>
+                <label>Barcode <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 400 }}>(optional if SKU is provided)</span></label>
                 <input
                   type="text"
                   value={formData.barcode}
                   onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-                  placeholder="Barcode number"
-                  required
-                  readOnly={!!editingProduct}
-                  style={editingProduct ? { opacity: 0.6 } : {}}
+                  placeholder="Barcode number (or leave empty)"
+                  readOnly={!!editingProduct && !!formData.barcode}
+                  style={editingProduct && formData.barcode ? { opacity: 0.6 } : {}}
                 />
               </div>
 
@@ -577,12 +580,13 @@ export default function Inventory() {
                   />
                 </div>
                 <div className="input-group">
-                  <label>SKU</label>
+                  <label>SKU {!formData.barcode ? '*' : ''}</label>
                   <input
                     type="text"
                     value={formData.sku}
                     onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                     placeholder="SKU code"
+                    required={!formData.barcode}
                   />
                 </div>
               </div>
