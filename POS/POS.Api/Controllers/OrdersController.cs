@@ -160,6 +160,13 @@ public class OrdersController : ControllerBase
         if (!deleted) return BadRequest(new { message = "Cannot delete order. It may be completed or not found." });
         return Ok(new { message = "Order deleted successfully" });
     }
+
+    [HttpGet("customer/{customerId}")]
+    public async Task<ActionResult<CustomerOrderSummary>> GetCustomerOrders(string customerId)
+    {
+        var summary = await _orderService.GetCustomerOrderSummaryAsync(customerId);
+        return Ok(summary);
+    }
 }
 
 public class CreateOrderRequest

@@ -87,6 +87,7 @@ export const orderApi = {
   sendPaymentReminder: (orderId) => api.post(`/orders/${orderId}/send-payment-reminder`),
   cancel: (orderId) => api.post(`/orders/${orderId}/cancel`),
   delete: (orderId) => api.delete(`/orders/${orderId}`),
+  getCustomerOrders: (customerId) => api.get(`/orders/customer/${customerId}`),
 };
 
 // Settings API

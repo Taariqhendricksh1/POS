@@ -429,4 +429,32 @@ public class OrderService
         order.TaxAmount = Math.Round(taxableAmount * order.TaxRate / (100 + order.TaxRate), 2); // VAT inclusive
         order.Total = taxableAmount;
     }
+
+    public async Task<List<Order>> GetOrdersByCustomerIdAsync(string customerId) =>
+        await _orders.Find(o => o.CustomerId == customerId && o.Status == OrderStatus.Completed)
+            .SortByDescending(o => o.CompletedAt).ToListAsync();
+
+    public async Task<CustomerOrderSummary> GetCustomerOrderSummaryAsync(string customerId)
+    {
+        var orders = await GetOrdersByCustomerIdAsync(customerId);
+        return new CustomerOrderSummary
+        {
+            TotalOrders = orders.Count,
+            TotalSpend = orders.Sum(o => o.Total),
+            TotalItems = orders.Sum(o => o.Items.Sum(i => i.Quantity)),
+            FirstOrderDate = orders.LastOrDefault()?.CompletedAt,
+            LastOrderDate = orders.FirstOrDefault()?.CompletedAt,
+            Orders = orders
+        };
+    }
+}
+
+public class CustomerOrderSummary
+{
+    public int TotalOrders { get; set; }
+    public decimal TotalSpend { get; set; }
+    public int TotalItems { get; set; }
+    public DateTime? FirstOrderDate { get; set; }
+    public DateTime? LastOrderDate { get; set; }
+    public List<Order> Orders { get; set; } = new();
 }
