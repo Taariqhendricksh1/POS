@@ -26,6 +26,9 @@ builder.Services.AddSingleton<StockTransferService>();
 builder.Services.AddSingleton<CustomerService>();
 builder.Services.AddSingleton<AuthService>();
 
+// Keep-alive background service to prevent Render free tier spin-down
+builder.Services.AddHostedService<KeepAliveService>();
+
 // JWT Authentication
 var jwtSecret = builder.Configuration["Jwt:Secret"] ?? "POS-SuperSecret-JWT-Key-2024-ChangeThisInProduction-MinLength32!";
 builder.Services.AddAuthentication(options =>

@@ -31,22 +31,30 @@ export default function Login() {
   const handleWake = async () => {
     setWaking(true);
     setWakeMsg('Waking backend — this can take up to 2 minutes on free tier...');
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120000);
-      const res = await fetch('/api/health', { signal: controller.signal });
-      clearTimeout(timeout);
-      const data = await res.json();
-      setWakeMsg(data.message || 'Backend is awake');
-    } catch (err) {
-      if (err.name === 'AbortError') {
-        setWakeMsg('Timed out — backend may still be starting, try again');
-      } else {
-        setWakeMsg('Could not reach backend — try again in a moment');
+    const maxAttempts = 12;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        const res = await fetch('/api/health', { signal: controller.signal });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const data = await res.json();
+          setWakeMsg(data.message || 'Backend is awake');
+          setWaking(false);
+          return;
+        }
+        // Non-OK (502/504 from proxy) — backend still starting
+      } catch {
+        // Network error or timeout — keep retrying
       }
-    } finally {
-      setWaking(false);
+      if (attempt < maxAttempts) {
+        setWakeMsg(`Waking backend — attempt ${attempt}/${maxAttempts}, please wait...`);
+        await new Promise(r => setTimeout(r, 10000));
+      }
     }
+    setWakeMsg('Backend did not respond — try again in a moment');
+    setWaking(false);
   };
 
   return (
@@ -188,7 +196,7 @@ export default function Login() {
             <div style={{
               fontSize: 11,
               color: wakeMsg.includes('awake') ? 'var(--success, #16a34a)'
-                : wakeMsg.includes('Could not') || wakeMsg.includes('Timed out') ? 'var(--danger)'
+                : wakeMsg.includes('did not respond') ? 'var(--danger)'
                 : 'var(--text-secondary)',
               marginTop: 4,
             }}>
