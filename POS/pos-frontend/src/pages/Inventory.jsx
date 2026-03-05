@@ -256,7 +256,7 @@ export default function Inventory() {
       sellingPrice: parseFloat(formData.sellingPrice) || 0,
       discountPercentage: parseFloat(formData.discountPercentage) || 0,
       quantityInStock: parseInt(formData.quantityInStock) || 0,
-      reorderLevel: parseInt(formData.reorderLevel) || 10,
+      reorderLevel: formData.reorderLevel !== '' ? parseInt(formData.reorderLevel) : 10,
       imageUrl: formData.imageUrl || null,
     };
 
