@@ -94,7 +94,7 @@ export default function Inventory() {
 
     if (tab === 'lowStock') {
       filtered = filtered.filter(
-        (p) => p.isActive && p.quantityInStock <= p.reorderLevel
+        (p) => p.isActive && p.reorderLevel > 0 && p.quantityInStock <= p.reorderLevel
       );
     }
 

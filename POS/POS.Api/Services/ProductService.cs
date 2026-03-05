@@ -159,6 +159,7 @@ public class ProductService
         var builder = Builders<Product>.Filter;
         var filter = builder.And(
             builder.Eq(p => p.IsActive, true),
+            builder.Gt(p => p.ReorderLevel, 0),
             builder.Where(p => p.QuantityInStock <= p.ReorderLevel)
         );
         if (shop != null)
@@ -178,7 +179,7 @@ public class ProductService
             TotalProducts = allProducts.Count,
             TotalStockValue = allProducts.Sum(p => p.CostPrice * p.QuantityInStock),
             TotalRetailValue = allProducts.Sum(p => p.SellingPrice * p.QuantityInStock),
-            LowStockCount = allProducts.Count(p => p.QuantityInStock <= p.ReorderLevel),
+            LowStockCount = allProducts.Count(p => p.ReorderLevel > 0 && p.QuantityInStock <= p.ReorderLevel),
             OutOfStockCount = allProducts.Count(p => p.QuantityInStock == 0)
         };
     }

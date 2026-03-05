@@ -67,5 +67,5 @@ public class Product
             : 0;
 
     [BsonIgnore]
-    public bool IsLowStock => QuantityInStock <= ReorderLevel;
+    public bool IsLowStock => ReorderLevel > 0 && QuantityInStock <= ReorderLevel;
 }
