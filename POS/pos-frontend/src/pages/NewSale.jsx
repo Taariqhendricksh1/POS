@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   ScanLine,
   Plus,
@@ -101,11 +102,52 @@ export default function NewSale() {
   const [customerAddress, setCustomerAddress] = useState(null); // stored address from customer
   const [useCustomerAddress, setUseCustomerAddress] = useState(true);
   const { showToast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const resumeHandled = useRef(false);
 
   // Load shops from settings
   useEffect(() => {
     settingsApi.getShops().then(res => setShops(res.data)).catch(() => {});
   }, []);
+
+  // Resume a pending order from OrderHistory
+  useEffect(() => {
+    const resumeId = location.state?.resumeOrderId;
+    if (!resumeId || resumeHandled.current) return;
+    resumeHandled.current = true;
+    // Clear the navigation state so a refresh doesn't re-trigger
+    navigate(location.pathname, { replace: true, state: {} });
+    (async () => {
+      try {
+        const res = await orderApi.getById(resumeId);
+        const o = res.data;
+        if (o.status !== 'Pending') {
+          showToast('This order is no longer pending', 'error');
+          return;
+        }
+        setOrder(o);
+        setClientName(o.clientName || '');
+        setClientEmail(o.clientEmail || '');
+        setClientPhone(o.clientPhone || '');
+        setSelectedCustomerId(o.customerId || null);
+        if (o.shippingCost > 0) setShippingCost(String(o.shippingCost));
+        if (o.deliveryRequired) {
+          setDeliveryRequired(true);
+          if (o.deliveryAddress) {
+            setDeliveryStreet(o.deliveryAddress.street || '');
+            setDeliveryCity(o.deliveryAddress.city || '');
+            setDeliveryProvince(o.deliveryAddress.province || '');
+            setDeliveryPostalCode(o.deliveryAddress.postalCode || '');
+          }
+        }
+        setStep(STEPS.SCAN);
+        showToast(`Resuming ${o.invoiceNumber}`, 'info');
+      } catch {
+        showToast('Failed to load order', 'error');
+      }
+    })();
+  }, [location.state]);
 
   // Debounced customer search
   useEffect(() => {

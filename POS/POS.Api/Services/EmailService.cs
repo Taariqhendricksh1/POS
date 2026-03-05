@@ -197,25 +197,25 @@ public class EmailService
         sb.AppendLine(@"<!DOCTYPE html><html><head><meta charset='utf-8'/>
         <meta name='viewport' content='width=device-width, initial-scale=1.0'/>
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
             .invoice { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
             .header { background: #1a1a2e; color: white; padding: 30px; text-align: center; }
             .header h1 { margin: 0; font-size: 24px; }
             .header p { margin: 5px 0 0; opacity: 0.8; }
             .badge { display: inline-block; background: #16c784; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 10px; }
             .details { padding: 20px 30px; border-bottom: 1px solid #eee; }
-            .details-grid { display: flex; justify-content: space-between; flex-wrap: wrap; }
-            .detail-item { margin-bottom: 10px; }
-            .detail-item label { font-size: 11px; color: #888; text-transform: uppercase; display: block; }
-            .detail-item span { font-size: 14px; font-weight: 600; }
             .items { padding: 0 30px; }
             .items table { width: 100%; border-collapse: collapse; }
             .items th { text-align: left; padding: 12px 8px; border-bottom: 2px solid #eee; font-size: 11px; text-transform: uppercase; color: #888; }
             .items td { padding: 12px 8px; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
             .items .amount { text-align: right; }
             .totals { padding: 20px 30px; background: #fafafa; }
-            .total-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
-            .total-row.grand { font-size: 20px; font-weight: 700; color: #1a1a2e; border-top: 2px solid #1a1a2e; padding-top: 12px; margin-top: 8px; }
+            .totals table { width: 100%; border-collapse: collapse; }
+            .totals td { padding: 8px 0; font-size: 14px; }
+            .totals td.label { text-align: left; color: #555; }
+            .totals td.value { text-align: right; color: #333; font-weight: 500; }
+            .totals tr.grand td { font-size: 20px; font-weight: 700; color: #1a1a2e; border-top: 2px solid #1a1a2e; padding-top: 14px; }
+            .totals tr.discount td { color: #16c784; }
             .bank-details { background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 16px; margin: 16px 30px; }
             .bank-details h3 { margin: 0 0 10px; font-size: 14px; color: #0369a1; }
             .bank-details table { width: 100%; font-size: 13px; }
@@ -231,12 +231,14 @@ public class EmailService
             sb.AppendLine($"<p>{settings.CompanyAddress}</p>");
         sb.AppendLine($"<span class='badge' style='background: {badgeColor};'>{statusBadge}</span></div>");
 
-        sb.AppendLine("<div class='details'><div class='details-grid'>");
-        sb.AppendLine($"<div class='detail-item'><label>Invoice</label><span>{order.InvoiceNumber}</span></div>");
-        sb.AppendLine($"<div class='detail-item'><label>Date</label><span>{order.CompletedAt?.ToString("dd MMM yyyy") ?? order.CreatedAt.ToString("dd MMM yyyy")}</span></div>");
-        sb.AppendLine($"<div class='detail-item'><label>Client</label><span>{order.ClientName}</span></div>");
-        sb.AppendLine($"<div class='detail-item'><label>Payment</label><span>{order.PaymentMethod}</span></div>");
-        sb.AppendLine("</div></div>");
+        // Details section using table for reliable email rendering
+        sb.AppendLine("<div class='details'><table width='100%' cellpadding='0' cellspacing='0' border='0'><tr>");
+        sb.AppendLine($"<td style='padding: 4px 0;' valign='top'><div style='font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 2px;'>Invoice</div><div style='font-size: 14px; font-weight: 600;'>{order.InvoiceNumber}</div></td>");
+        sb.AppendLine($"<td style='padding: 4px 0;' valign='top'><div style='font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 2px;'>Date</div><div style='font-size: 14px; font-weight: 600;'>{order.CompletedAt?.ToString("dd MMM yyyy") ?? order.CreatedAt.ToString("dd MMM yyyy")}</div></td>");
+        sb.AppendLine("</tr><tr>");
+        sb.AppendLine($"<td style='padding: 4px 0;' valign='top'><div style='font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 2px;'>Client</div><div style='font-size: 14px; font-weight: 600;'>{order.ClientName}</div></td>");
+        sb.AppendLine($"<td style='padding: 4px 0;' valign='top'><div style='font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 2px;'>Payment</div><div style='font-size: 14px; font-weight: 600;'>{order.PaymentMethod}</div></td>");
+        sb.AppendLine("</tr></table></div>");
 
         sb.AppendLine("<div class='items'><table>");
         sb.AppendLine("<tr><th>Item</th><th>Qty</th><th class='amount'>Price</th><th class='amount'>Total</th></tr>");
@@ -252,15 +254,16 @@ public class EmailService
 
         sb.AppendLine("</table></div>");
 
-        sb.AppendLine("<div class='totals'>");
-        sb.AppendLine($"<div class='total-row'><span>Subtotal</span><span>{currency}{order.Subtotal:N2}</span></div>");
+        // Totals section using table for reliable email rendering
+        sb.AppendLine("<div class='totals'><table>");
+        sb.AppendLine($"<tr><td class='label'>Subtotal</td><td class='value'>{currency}{order.Subtotal:N2}</td></tr>");
         if (order.DiscountTotal > 0)
-            sb.AppendLine($"<div class='total-row'><span>Discount</span><span>-{currency}{order.DiscountTotal:N2}</span></div>");
-        sb.AppendLine($"<div class='total-row'><span>VAT ({order.TaxRate}% incl.)</span><span>{currency}{order.TaxAmount:N2}</span></div>");
+            sb.AppendLine($"<tr class='discount'><td class='label'>Discount</td><td class='value'>-{currency}{order.DiscountTotal:N2}</td></tr>");
+        sb.AppendLine($"<tr><td class='label'>VAT ({order.TaxRate}% incl.)</td><td class='value'>{currency}{order.TaxAmount:N2}</td></tr>");
         if (order.ShippingCost > 0)
-            sb.AppendLine($"<div class='total-row'><span>Shipping</span><span>{currency}{order.ShippingCost:N2}</span></div>");
-        sb.AppendLine($"<div class='total-row grand'><span>Total</span><span>{currency}{order.Total:N2}</span></div>");
-        sb.AppendLine("</div>");
+            sb.AppendLine($"<tr><td class='label'>Shipping</td><td class='value'>{currency}{order.ShippingCost:N2}</td></tr>");
+        sb.AppendLine($"<tr class='grand'><td class='label'>Total</td><td class='value'>{currency}{order.Total:N2}</td></tr>");
+        sb.AppendLine("</table></div>");
 
         // Delivery info section
         if (order.DeliveryRequired && order.DeliveryAddress != null)

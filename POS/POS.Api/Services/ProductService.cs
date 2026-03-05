@@ -15,18 +15,38 @@ public class ProductService
         var database = client.GetDatabase(settings.Value.DatabaseName);
         _products = database.GetCollection<Product>("products");
 
-        // Drop old unique barcode index if it exists, replace with sparse index
-        try { _products.Indexes.DropOne("Barcode_1"); } catch { /* index may not exist */ }
+        // Drop any existing barcode indexes that might conflict with new sparse index
+        try
+        {
+            var indexes = _products.Indexes.List().ToList();
+            foreach (var idx in indexes)
+            {
+                var name = idx["name"].AsString;
+                if (name is "barcode_1" or "Barcode_1")
+                {
+                    try { _products.Indexes.DropOne(name); } catch { }
+                }
+            }
+        }
+        catch { /* ignore index enumeration errors */ }
 
         // Create sparse index on barcode (allows multiple empty/null barcodes)
-        var barcodeIndex = Builders<Product>.IndexKeys.Ascending(p => p.Barcode);
-        _products.Indexes.CreateOne(new CreateIndexModel<Product>(barcodeIndex,
-            new CreateIndexOptions { Sparse = true }));
+        try
+        {
+            var barcodeIndex = Builders<Product>.IndexKeys.Ascending(p => p.Barcode);
+            _products.Indexes.CreateOne(new CreateIndexModel<Product>(barcodeIndex,
+                new CreateIndexOptions { Sparse = true }));
+        }
+        catch { /* index may already exist with same options */ }
 
-        // Create index on SKU for fast lookups
-        var skuIndex = Builders<Product>.IndexKeys.Ascending(p => p.Sku);
-        _products.Indexes.CreateOne(new CreateIndexModel<Product>(skuIndex,
-            new CreateIndexOptions { Sparse = true }));
+        // Create sparse index on SKU for fast lookups
+        try
+        {
+            var skuIndex = Builders<Product>.IndexKeys.Ascending(p => p.Sku);
+            _products.Indexes.CreateOne(new CreateIndexModel<Product>(skuIndex,
+                new CreateIndexOptions { Sparse = true }));
+        }
+        catch { /* index may already exist with same options */ }
     }
 
     public async Task<List<Product>> GetAllAsync(string? shop = null)

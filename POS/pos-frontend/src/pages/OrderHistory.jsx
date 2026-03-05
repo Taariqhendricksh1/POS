@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { History, Receipt, Search, CheckCircle2, Trash2, CreditCard, Banknote, Building2, X, Lock, Store, Send, DollarSign, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { History, Receipt, Search, CheckCircle2, Trash2, CreditCard, Banknote, Building2, X, Lock, Store, Send, DollarSign, Clock, Pencil } from 'lucide-react';
 import { orderApi } from '../api';
 import { useToast } from '../hooks/useToast';
 
@@ -14,6 +15,7 @@ export default function OrderHistory() {
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(null);
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadOrders();
@@ -265,21 +267,33 @@ export default function OrderHistory() {
 
             {/* Actions for Pending orders */}
             {isPending(selectedOrder) && !showCompleteConfirm && (
-              <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 16 }}>
                 <button
-                  className="btn btn-success"
-                  onClick={() => setShowCompleteConfirm(selectedOrder)}
-                  style={{ flex: 2 }}
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setSelectedOrder(null);
+                    navigate('/sale', { state: { resumeOrderId: selectedOrder.id } });
+                  }}
+                  style={{ width: '100%' }}
                 >
-                  <CheckCircle2 size={16} /> Mark Completed
+                  <Pencil size={16} /> Edit / Resume Sale
                 </button>
-                <button
-                  className="btn btn-danger"
-                  onClick={() => handleDeleteOrder(selectedOrder)}
-                  style={{ flex: 1 }}
-                >
-                  <Trash2 size={16} /> Delete
-                </button>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    className="btn btn-success"
+                    onClick={() => setShowCompleteConfirm(selectedOrder)}
+                    style={{ flex: 2 }}
+                  >
+                    <CheckCircle2 size={16} /> Mark Completed
+                  </button>
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => handleDeleteOrder(selectedOrder)}
+                    style={{ flex: 1 }}
+                  >
+                    <Trash2 size={16} /> Delete
+                  </button>
+                </div>
               </div>
             )}
 
