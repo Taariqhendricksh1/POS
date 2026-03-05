@@ -96,6 +96,21 @@ export const settingsApi = {
   getShops: () => api.get('/settings/shops'),
 };
 
+// Stock Transfer API
+export const stockTransferApi = {
+  create: (recipientCompany, recipientContact, recipientPhone, recipientEmail, notes) =>
+    api.post('/stock-transfers', { recipientCompany, recipientContact, recipientPhone, recipientEmail, notes }),
+  getById: (id) => api.get(`/stock-transfers/${id}`),
+  getRecent: (limit = 50) => api.get(`/stock-transfers/recent?limit=${limit}`),
+  addItem: (transferId, barcode) => api.post(`/stock-transfers/${transferId}/items`, { barcode }),
+  updateItemQty: (transferId, productId, quantity) =>
+    api.put(`/stock-transfers/${transferId}/items/${productId}`, { quantity }),
+  removeItem: (transferId, productId) => api.delete(`/stock-transfers/${transferId}/items/${productId}`),
+  complete: (transferId) => api.post(`/stock-transfers/${transferId}/complete`),
+  cancel: (transferId) => api.post(`/stock-transfers/${transferId}/cancel`),
+  delete: (transferId) => api.delete(`/stock-transfers/${transferId}`),
+};
+
 // Customers API
 export const customerApi = {
   getAll: () => api.get('/customers'),

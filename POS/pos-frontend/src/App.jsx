@@ -11,6 +11,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import UserManagement from './pages/UserManagement';
 import ChangePassword from './pages/ChangePassword';
 import SettingsPage from './pages/Settings';
+import StockTransferPage from './pages/StockTransfer';
 import Toast from './components/Toast';
 import { ToastProvider } from './hooks/useToast';
 import { AuthProvider, useAuth } from './hooks/useAuth';
@@ -105,6 +106,7 @@ function AppLayout() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/customers" element={<Customers />} />
           <Route path="/sale" element={<NewSale />} />
+          <Route path="/stock-transfer" element={<StockTransferPage />} />
           <Route path="/orders" element={<OrderHistory />} />
           <Route path="/change-password" element={<ChangePassword />} />
           {isAdmin && <Route path="/users" element={<UserManagement />} />}

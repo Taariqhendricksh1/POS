@@ -22,6 +22,7 @@ builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<ProductService>();
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddSingleton<OrderService>();
+builder.Services.AddSingleton<StockTransferService>();
 builder.Services.AddSingleton<CustomerService>();
 builder.Services.AddSingleton<AuthService>();
 

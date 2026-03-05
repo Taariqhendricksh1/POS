@@ -88,6 +88,7 @@ export default function NewSale() {
   // Inline discount
   const [discountItemId, setDiscountItemId] = useState(null);
   const [discountValue, setDiscountValue] = useState('');
+  const invoiceRef = useRef(null);
   const { showToast } = useToast();
 
   // Load shops from settings
@@ -436,10 +437,10 @@ export default function NewSale() {
   // Helper: is start-sale enabled?
   const canStart =
     clientMode === CLIENT_MODES.EXISTING
-      ? selectedCustomerId && clientName && clientEmail
+      ? selectedCustomerId && clientName
       : clientMode === CLIENT_MODES.NEW
         ? newCustFirstName && newCustLastName && newCustEmail
-        : clientName && clientEmail; // guest needs name + email
+        : clientName; // guest only needs name
 
   // Step 1: Client Details
   if (step === STEPS.CLIENT) {
@@ -565,8 +566,8 @@ export default function NewSale() {
                   <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Walk-in Customer" required />
                 </div>
                 <div className="input-group">
-                  <label>Email *</label>
-                  <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="client@email.com" required />
+                  <label>Email <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 400 }}>(optional — leave blank for no-email sale)</span></label>
+                  <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="client@email.com (optional)" />
                 </div>
               </>
             )}
@@ -943,7 +944,10 @@ export default function NewSale() {
 
           <div style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
             <Send size={14} />
-            Invoice will be emailed to <strong>{clientEmail}</strong>
+            {clientEmail
+              ? <>Invoice will be emailed to <strong>{clientEmail}</strong></>
+              : <>No email — invoice will be shown on screen for screenshot</>
+            }
           </div>
 
           <div style={{ display: 'flex', gap: 10 }}>
@@ -978,6 +982,7 @@ export default function NewSale() {
 
   // Step 4: Success
   if (step === STEPS.SUCCESS) {
+    const hasEmail = !!clientEmail;
     return (
       <div>
         <div className="success-screen">
@@ -986,18 +991,18 @@ export default function NewSale() {
           </div>
           <h2 style={{ fontSize: 22, marginBottom: 4 }}>Sale Complete!</h2>
 
-          {/* Email status */}
-          {emailStatus === null && (
+          {/* Email status — only show if customer has email */}
+          {hasEmail && emailStatus === null && (
             <p style={{ color: 'var(--text-secondary)', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <span className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} /> Sending invoice to {clientEmail}...
             </p>
           )}
-          {emailStatus === true && (
+          {hasEmail && emailStatus === true && (
             <p style={{ color: 'var(--success, #16a34a)', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <Send size={14} /> Invoice sent to {clientEmail}
             </p>
           )}
-          {emailStatus === false && (
+          {hasEmail && emailStatus === false && (
             <div style={{ marginBottom: 20, textAlign: 'center' }}>
               <p style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 8 }}>
                 <AlertCircle size={14} /> Failed to send invoice to {clientEmail}
@@ -1013,30 +1018,133 @@ export default function NewSale() {
             </div>
           )}
 
-          <div className="card" style={{ textAlign: 'left', marginBottom: 20 }}>
-            <div className="summary-row">
-              <span>Invoice</span>
-              <span style={{ fontWeight: 600 }}>{order?.invoiceNumber}</span>
+          {/* No-email notice */}
+          {!hasEmail && (
+            <p style={{ color: 'var(--text-secondary)', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 13 }}>
+              <AlertCircle size={14} /> No email — invoice sent to company email. Use screenshot below for WhatsApp.
+            </p>
+          )}
+
+          {/* Invoice Preview for screenshot — always shown, especially useful for no-email sales */}
+          <div ref={invoiceRef} style={{
+            background: 'white', borderRadius: 12, overflow: 'hidden',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)', marginBottom: 20, textAlign: 'left',
+          }}>
+            <div style={{ background: '#1a1a2e', color: 'white', padding: '20px 24px', textAlign: 'center' }}>
+              <h3 style={{ margin: 0, fontSize: 20 }}>INVOICE</h3>
+              <div style={{ display: 'inline-block', background: '#16c784', color: 'white', padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, marginTop: 6 }}>PAID</div>
             </div>
-            <div className="summary-row">
-              <span>Client</span>
-              <span>{clientName}</span>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase' }}>Invoice</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{order?.invoiceNumber}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase' }}>Date</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{new Date().toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase' }}>Client</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{clientName}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase' }}>Payment</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{order?.paymentMethod}</div>
+              </div>
             </div>
-            <div className="summary-row">
-              <span>Items</span>
-              <span>{order?.items.length}</span>
+            <div style={{ padding: '12px 20px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #eee' }}>
+                    <th style={{ textAlign: 'left', padding: '8px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Item</th>
+                    <th style={{ textAlign: 'center', padding: '8px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Qty</th>
+                    <th style={{ textAlign: 'right', padding: '8px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Price</th>
+                    <th style={{ textAlign: 'right', padding: '8px 4px', fontSize: 10, textTransform: 'uppercase', color: '#888' }}>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {order?.items.map((item) => (
+                    <tr key={item.productId} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <td style={{ padding: '8px 4px' }}>{item.productName}</td>
+                      <td style={{ textAlign: 'center', padding: '8px 4px' }}>{item.quantity}</td>
+                      <td style={{ textAlign: 'right', padding: '8px 4px' }}>
+                        {item.discountPercentage > 0
+                          ? <><s style={{ color: '#999' }}>R{item.unitPrice.toFixed(2)}</s> R{item.effectivePrice.toFixed(2)}</>
+                          : <>R{item.effectivePrice.toFixed(2)}</>
+                        }
+                      </td>
+                      <td style={{ textAlign: 'right', padding: '8px 4px', fontWeight: 600 }}>R{item.lineTotal.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div className="summary-row">
-              <span>Payment</span>
-              <span className="badge badge-info">{order?.paymentMethod}</span>
-            </div>
-            <div className="summary-row total">
-              <span>Total Paid</span>
-              <span>R{order?.total.toFixed(2)}</span>
+            <div style={{ padding: '12px 20px', background: '#fafafa' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                <span>Subtotal</span><span>R{order?.subtotal.toFixed(2)}</span>
+              </div>
+              {order?.discountTotal > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: 'var(--success, green)' }}>
+                  <span>Discount</span><span>-R{order.discountTotal.toFixed(2)}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                <span>VAT ({order?.taxRate}% incl.)</span><span>R{order?.taxAmount.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 4px', fontSize: 18, fontWeight: 700, borderTop: '2px solid #1a1a2e', marginTop: 8 }}>
+                <span>Total</span><span>R{order?.total.toFixed(2)}</span>
+              </div>
             </div>
           </div>
 
-          <button className="btn btn-primary" onClick={resetSale}>
+          {/* Screenshot button */}
+          <button
+            className="btn btn-outline"
+            onClick={() => {
+              if (invoiceRef.current) {
+                // Use native share/screenshot where available, fallback to select content
+                if (navigator.share) {
+                  // Try to use canvas to create image for sharing
+                  import('html2canvas').then(({ default: html2canvas }) => {
+                    html2canvas(invoiceRef.current, { scale: 2, useCORS: true }).then(canvas => {
+                      canvas.toBlob(blob => {
+                        const file = new File([blob], `${order?.invoiceNumber || 'invoice'}.png`, { type: 'image/png' });
+                        navigator.share({ files: [file], title: order?.invoiceNumber }).catch(() => {
+                          // Fallback: download the image
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `${order?.invoiceNumber || 'invoice'}.png`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        });
+                      });
+                    });
+                  }).catch(() => {
+                    showToast('Take a screenshot of the invoice above', 'info');
+                  });
+                } else {
+                  // Desktop fallback: try html2canvas download
+                  import('html2canvas').then(({ default: html2canvas }) => {
+                    html2canvas(invoiceRef.current, { scale: 2, useCORS: true }).then(canvas => {
+                      const url = canvas.toDataURL('image/png');
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `${order?.invoiceNumber || 'invoice'}.png`;
+                      a.click();
+                    });
+                  }).catch(() => {
+                    showToast('Take a screenshot of the invoice above', 'info');
+                  });
+                }
+              }
+            }}
+            style={{ marginBottom: 12, width: '100%' }}
+          >
+            📸 Save Invoice Image
+          </button>
+
+          <button className="btn btn-primary" onClick={resetSale} style={{ width: '100%' }}>
             <ShoppingCart size={18} /> Start New Sale
           </button>
         </div>

@@ -7,6 +7,7 @@ import {
   TrendingUp,
   XCircle,
   ArrowRight,
+  ArrowRightLeft,
   Store,
   ChevronDown,
   ChevronUp,
@@ -216,12 +217,17 @@ export default function Dashboard() {
       </div>
 
       {/* Quick Actions — top */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 10 }}>
         <button className="btn btn-primary" onClick={() => navigate('/sale')} style={{ flex: 1 }}>
           <ShoppingCart size={18} /> New Sale
         </button>
         <button className="btn btn-outline" onClick={() => navigate('/inventory')} style={{ flex: 1 }}>
           <Package size={18} /> Inventory
+        </button>
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <button className="btn btn-outline" onClick={() => navigate('/stock-transfer')} style={{ width: '100%' }}>
+          <ArrowRightLeft size={18} /> Transfer Stock
         </button>
       </div>
 

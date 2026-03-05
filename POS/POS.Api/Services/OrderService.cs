@@ -180,16 +180,39 @@ public class OrderService
         await _orders.ReplaceOneAsync(o => o.Id == orderId, order);
 
         // Send invoice email (fire and forget, track result)
+        // If no client email, send to company email instead
         _ = Task.Run(async () =>
         {
             try
             {
-                await _emailService.SendInvoiceEmailAsync(order);
-                var emailUpdate = Builders<Order>.Update
-                    .Set(o => o.EmailSent, true)
-                    .Set(o => o.EmailError, null);
-                await _orders.UpdateOneAsync(o => o.Id == orderId, emailUpdate);
-                _logger.LogInformation("Invoice email sent for {InvoiceNumber}", order.InvoiceNumber);
+                var settings = await _settingsService.GetAsync();
+                var emailTarget = order.ClientEmail;
+                if (string.IsNullOrEmpty(emailTarget))
+                {
+                    emailTarget = settings.CompanyEmail;
+                }
+
+                if (!string.IsNullOrEmpty(emailTarget))
+                {
+                    // Temporarily set client email for the email service
+                    var originalEmail = order.ClientEmail;
+                    order.ClientEmail = emailTarget;
+                    await _emailService.SendInvoiceEmailAsync(order);
+                    order.ClientEmail = originalEmail; // Restore original
+                    var emailUpdate = Builders<Order>.Update
+                        .Set(o => o.EmailSent, true)
+                        .Set(o => o.EmailError, null);
+                    await _orders.UpdateOneAsync(o => o.Id == orderId, emailUpdate);
+                    _logger.LogInformation("Invoice email sent for {InvoiceNumber} to {Email}", order.InvoiceNumber, emailTarget);
+                }
+                else
+                {
+                    _logger.LogWarning("No email address for order {InvoiceNumber} — skipping email", order.InvoiceNumber);
+                    var emailUpdate = Builders<Order>.Update
+                        .Set(o => o.EmailSent, false)
+                        .Set(o => o.EmailError, "No email address provided");
+                    await _orders.UpdateOneAsync(o => o.Id == orderId, emailUpdate);
+                }
             }
             catch (Exception ex)
             {
