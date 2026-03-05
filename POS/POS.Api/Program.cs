@@ -18,6 +18,7 @@ builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("App"))
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 
 // Services
+builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<ProductService>();
 builder.Services.AddSingleton<EmailService>();
 builder.Services.AddSingleton<OrderService>();

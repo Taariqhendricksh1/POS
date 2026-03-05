@@ -89,6 +89,12 @@ export const orderApi = {
   delete: (orderId) => api.delete(`/orders/${orderId}`),
 };
 
+// Settings API
+export const settingsApi = {
+  get: () => api.get('/settings'),
+  update: (settings) => api.put('/settings', settings),
+};
+
 // Customers API
 export const customerApi = {
   getAll: () => api.get('/customers'),

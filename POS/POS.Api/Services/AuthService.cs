@@ -15,13 +15,13 @@ public class AuthService
     private readonly IMongoCollection<User> _users;
     private readonly JwtSettings _jwtSettings;
     private readonly EmailService _emailService;
-    private readonly AppSettings _appSettings;
+    private readonly SettingsService _settingsService;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
         IOptions<MongoDbSettings> dbSettings,
         IOptions<JwtSettings> jwtSettings,
-        IOptions<AppSettings> appSettings,
+        SettingsService settingsService,
         EmailService emailService,
         ILogger<AuthService> logger)
     {
@@ -30,7 +30,7 @@ public class AuthService
         _users = database.GetCollection<User>("users");
         _jwtSettings = jwtSettings.Value;
         _emailService = emailService;
-        _appSettings = appSettings.Value;
+        _settingsService = settingsService;
         _logger = logger;
 
         // Create unique index on email
@@ -205,7 +205,8 @@ public class AuthService
 
     private async Task SendPasswordResetEmailAsync(string email, string name, string token)
     {
-        var subject = $"Password Reset - {_appSettings.CompanyName} POS";
+        var settings = await _settingsService.GetAsync();
+        var subject = $"Password Reset - {settings.CompanyName} POS";
         var htmlBody = $@"
             <div style='font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;'>
                 <h2 style='color: #1a1a2e;'>Password Reset</h2>
@@ -216,7 +217,7 @@ public class AuthService
                 </div>
                 <p>Copy this code and paste it on the reset password page.</p>
                 <p style='color: #888; font-size: 13px;'>This code expires in 1 hour. If you didn't request this, ignore this email.</p>
-                <p>— {_appSettings.CompanyName} POS</p>
+                <p>— {settings.CompanyName} POS</p>
             </div>";
         var textBody = $"Password Reset Code: {token}\n\nThis code expires in 1 hour.";
 

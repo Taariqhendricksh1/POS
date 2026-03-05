@@ -12,12 +12,12 @@ public class OrderService
     private readonly IMongoCollection<InvoiceCounter> _counters;
     private readonly ProductService _productService;
     private readonly EmailService _emailService;
-    private readonly AppSettings _appSettings;
+    private readonly SettingsService _settingsService;
     private readonly ILogger<OrderService> _logger;
 
     public OrderService(
         IOptions<MongoDbSettings> dbSettings,
-        IOptions<AppSettings> appSettings,
+        SettingsService settingsService,
         ProductService productService,
         EmailService emailService,
         ILogger<OrderService> logger)
@@ -28,7 +28,7 @@ public class OrderService
         _counters = database.GetCollection<InvoiceCounter>("counters");
         _productService = productService;
         _emailService = emailService;
-        _appSettings = appSettings.Value;
+        _settingsService = settingsService;
         _logger = logger;
     }
 
@@ -42,12 +42,14 @@ public class OrderService
             ReturnDocument = ReturnDocument.After
         };
         var counter = await _counters.FindOneAndUpdateAsync(filter, update, options);
-        return $"{_appSettings.InvoicePrefix}-{counter.Sequence:D6}";
+        var settings = await _settingsService.GetAsync();
+        return $"{settings.InvoicePrefix}-{counter.Sequence:D6}";
     }
 
     public async Task<Order> CreateOrderAsync(string clientEmail, string clientName, string? customerId = null, string? clientPhone = null)
     {
         var invoiceNumber = await GenerateInvoiceNumberAsync();
+        var settings = await _settingsService.GetAsync();
         var order = new Order
         {
             InvoiceNumber = invoiceNumber,
@@ -55,7 +57,7 @@ public class OrderService
             ClientName = clientName,
             CustomerId = customerId,
             ClientPhone = clientPhone,
-            TaxRate = _appSettings.DefaultTaxRate,
+            TaxRate = settings.DefaultTaxRate,
             Status = OrderStatus.Pending
         };
         await _orders.InsertOneAsync(order);
@@ -332,7 +334,8 @@ public class OrderService
             var totalOrdersShop = filteredOrders.Count;
             var totalItemsShop = filteredOrders.Sum(x => x.items.Sum(i => i.Quantity));
             var totalDiscountShop = filteredOrders.Sum(x => x.items.Sum(i => i.Quantity * (i.UnitPrice - i.EffectivePrice)));
-            var taxRate = _appSettings.DefaultTaxRate;
+            var appSettings = await _settingsService.GetAsync();
+            var taxRate = appSettings.DefaultTaxRate;
             var totalTaxShop = Math.Round(totalSalesShop * taxRate / (100 + taxRate), 2);
             var avgShop = totalOrdersShop > 0 ? totalSalesShop / totalOrdersShop : 0;
 

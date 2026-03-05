@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Package, BarChart3, History, Users, LogOut, Shield, UserCircle, Lock } from 'lucide-react';
+import { ShoppingCart, Package, BarChart3, History, Users, LogOut, Shield, UserCircle, Lock, Settings } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Inventory from './pages/Inventory';
 import NewSale from './pages/NewSale';
@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import UserManagement from './pages/UserManagement';
 import ChangePassword from './pages/ChangePassword';
+import SettingsPage from './pages/Settings';
 import Toast from './components/Toast';
 import { ToastProvider } from './hooks/useToast';
 import { AuthProvider, useAuth } from './hooks/useAuth';
@@ -74,6 +75,12 @@ function AppLayout() {
                     <span>Users</span>
                   </a>
                 )}
+                {isAdmin && (
+                  <a className="profile-dropdown-item" onClick={() => { setMenuOpen(false); navigate('/settings'); }}>
+                    <Settings size={16} />
+                    <span>Settings</span>
+                  </a>
+                )}
                 <a className="profile-dropdown-item" onClick={() => { setMenuOpen(false); navigate('/change-password'); }}>
                   <Lock size={16} />
                   <span>Change Password</span>
@@ -97,6 +104,7 @@ function AppLayout() {
           <Route path="/orders" element={<OrderHistory />} />
           <Route path="/change-password" element={<ChangePassword />} />
           {isAdmin && <Route path="/users" element={<UserManagement />} />}
+          {isAdmin && <Route path="/settings" element={<SettingsPage />} />}
         </Routes>
       </div>
 
