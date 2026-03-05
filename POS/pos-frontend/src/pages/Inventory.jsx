@@ -15,6 +15,9 @@ import {
   Power,
   PowerOff,
   Image as ImageIcon,
+  Filter,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { productApi, settingsApi } from '../api';
 import { useToast } from '../hooks/useToast';
@@ -48,6 +51,10 @@ export default function Inventory() {
   const [tab, setTab] = useState('all'); // 'all', 'lowStock'
   const [shops, setShops] = useState([]);
   const [selectedShop, setSelectedShop] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
   const [scannedBarcode, setScannedBarcode] = useState('');
   const [showCamera, setShowCamera] = useState(false);
   const videoRef = useRef(null);
@@ -62,8 +69,15 @@ export default function Inventory() {
   }, []);
 
   useEffect(() => {
+    // Extract unique categories from products
+    const cats = [...new Set(products.map(p => p.category).filter(c => c && c.trim()))].sort();
+    setCategories(cats);
+  }, [products]);
+
+  useEffect(() => {
     filterProducts();
-  }, [products, search, tab, selectedShop]);
+    setCurrentPage(1); // Reset to page 1 when filters change
+  }, [products, search, tab, selectedShop, selectedCategory]);
 
   const loadProducts = async () => {
     try {
@@ -96,6 +110,10 @@ export default function Inventory() {
       filtered = filtered.filter(
         (p) => p.isActive && p.reorderLevel > 0 && p.quantityInStock <= p.reorderLevel
       );
+    }
+
+    if (selectedCategory) {
+      filtered = filtered.filter((p) => p.category === selectedCategory);
     }
 
     if (search.trim()) {
@@ -342,15 +360,16 @@ export default function Inventory() {
         </button>
       </div>
 
-      {/* Shop Filter */}
-      {shops.length > 0 && (
-        <div className="shop-filter" style={{ marginBottom: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Store size={18} color="var(--primary)" />
+      {/* Filters Row */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        {shops.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 120 }}>
+            <Store size={16} color="var(--primary)" />
             <select
               value={selectedShop}
               onChange={(e) => setSelectedShop(e.target.value)}
               className="shop-select"
+              style={{ width: '100%' }}
             >
               <option value="">All Shops</option>
               {shops.map((shop) => (
@@ -358,8 +377,24 @@ export default function Inventory() {
               ))}
             </select>
           </div>
-        </div>
-      )}
+        )}
+        {categories.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 120 }}>
+            <Filter size={16} color="var(--primary)" />
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="shop-select"
+              style={{ width: '100%' }}
+            >
+              <option value="">All Categories</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
 
       {/* Search */}
       <div className="search-bar">
@@ -442,7 +477,15 @@ export default function Inventory() {
           <p>{search ? 'Try a different search' : 'Scan a barcode to add your first product'}</p>
         </div>
       ) : (
-        filteredProducts.map((product) => (
+        <>
+        {/* Product count & page info */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+          <span>{filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''}</span>
+          {filteredProducts.length > ITEMS_PER_PAGE && (
+            <span>Page {currentPage} of {Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)}</span>
+          )}
+        </div>
+        {filteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE).map((product) => (
           <div
             key={product.id}
             className="product-item"
@@ -521,7 +564,67 @@ export default function Inventory() {
               </div>
             </div>
           </div>
-        ))
+        ))}
+
+        {/* Pagination Controls */}
+        {filteredProducts.length > ITEMS_PER_PAGE && (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12, padding: '16px 0', marginBottom: 8 }}>
+            <button
+              className="btn btn-outline"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              style={{ padding: '8px 14px' }}
+            >
+              <ChevronLeft size={16} /> Prev
+            </button>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {Array.from({ length: Math.ceil(filteredProducts.length / ITEMS_PER_PAGE) }, (_, i) => i + 1)
+                .filter(page => {
+                  const total = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+                  if (total <= 7) return true;
+                  if (page === 1 || page === total) return true;
+                  if (Math.abs(page - currentPage) <= 1) return true;
+                  return false;
+                })
+                .reduce((acc, page, idx, arr) => {
+                  if (idx > 0 && page - arr[idx - 1] > 1) acc.push('...');
+                  acc.push(page);
+                  return acc;
+                }, [])
+                .map((page, idx) =>
+                  page === '...' ? (
+                    <span key={`dot-${idx}`} style={{ padding: '8px 4px', color: 'var(--text-secondary)' }}>...</span>
+                  ) : (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: 'var(--radius-sm)',
+                        border: 'none',
+                        background: page === currentPage ? 'var(--primary)' : 'var(--surface)',
+                        color: page === currentPage ? 'white' : 'var(--text)',
+                        fontWeight: page === currentPage ? 600 : 400,
+                        cursor: 'pointer',
+                        fontSize: 13,
+                      }}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+            </div>
+            <button
+              className="btn btn-outline"
+              onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredProducts.length / ITEMS_PER_PAGE), p + 1))}
+              disabled={currentPage >= Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)}
+              style={{ padding: '8px 14px' }}
+            >
+              Next <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+        </>
       )}
 
       {/* Product Form Modal */}
