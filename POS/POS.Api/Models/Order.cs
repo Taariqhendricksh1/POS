@@ -93,6 +93,9 @@ public class OrderItem
     [BsonElement("discountPercentage")]
     public decimal DiscountPercentage { get; set; }
 
+    [BsonElement("isProductDiscount")]
+    public bool IsProductDiscount { get; set; }
+
     [BsonElement("effectivePrice")]
     public decimal EffectivePrice { get; set; }
 

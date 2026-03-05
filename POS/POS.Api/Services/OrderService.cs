@@ -62,15 +62,15 @@ public class OrderService
         return order;
     }
 
-    public async Task<Order?> AddItemToOrderAsync(string orderId, string barcode)
+    public async Task<AddItemResult> AddItemToOrderAsync(string orderId, string barcode)
     {
         var order = await _orders.Find(o => o.Id == orderId).FirstOrDefaultAsync();
-        if (order == null || order.Status != OrderStatus.Pending) return null;
+        if (order == null || order.Status != OrderStatus.Pending) return AddItemResult.OrderInvalid();
 
         var product = await _productService.GetByBarcodeAsync(barcode);
-        if (product == null || !product.IsActive) return null;
+        if (product == null || !product.IsActive) return AddItemResult.NotFound();
 
-        if (product.QuantityInStock <= 0) return null;
+        if (product.QuantityInStock <= 0) return AddItemResult.OutOfStock(product);
 
         // Check if item already exists in order
         var existingItem = order.Items.FirstOrDefault(i => i.ProductId == product.Id);
@@ -94,6 +94,7 @@ public class OrderService
                 Quantity = 1,
                 UnitPrice = product.SellingPrice,
                 DiscountPercentage = product.DiscountPercentage,
+                IsProductDiscount = product.DiscountPercentage > 0,
                 EffectivePrice = effectivePrice,
                 LineTotal = effectivePrice
             });
@@ -101,7 +102,7 @@ public class OrderService
 
         RecalculateTotals(order);
         await _orders.ReplaceOneAsync(o => o.Id == orderId, order);
-        return order;
+        return AddItemResult.Ok(order);
     }
 
     public async Task<Order?> UpdateItemQuantityAsync(string orderId, string productId, int quantity)
@@ -129,6 +130,28 @@ public class OrderService
     public async Task<Order?> RemoveItemFromOrderAsync(string orderId, string productId)
     {
         return await UpdateItemQuantityAsync(orderId, productId, 0);
+    }
+
+    public async Task<Order?> UpdateItemDiscountAsync(string orderId, string productId, decimal discountPercentage)
+    {
+        var order = await _orders.Find(o => o.Id == orderId).FirstOrDefaultAsync();
+        if (order == null || order.Status != OrderStatus.Pending) return null;
+
+        var item = order.Items.FirstOrDefault(i => i.ProductId == productId);
+        if (item == null) return null;
+
+        // Don't allow overriding product-level discounts
+        if (item.IsProductDiscount) return null;
+
+        item.DiscountPercentage = Math.Clamp(discountPercentage, 0, 100);
+        item.EffectivePrice = discountPercentage > 0
+            ? item.UnitPrice * (1 - item.DiscountPercentage / 100)
+            : item.UnitPrice;
+        item.LineTotal = item.Quantity * item.EffectivePrice;
+
+        RecalculateTotals(order);
+        await _orders.ReplaceOneAsync(o => o.Id == orderId, order);
+        return order;
     }
 
     public async Task<Order?> CompleteOrderAsync(string orderId, PaymentMethod paymentMethod)

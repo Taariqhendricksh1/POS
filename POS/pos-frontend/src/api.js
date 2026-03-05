@@ -77,6 +77,8 @@ export const orderApi = {
   addItem: (orderId, barcode) => api.post(`/orders/${orderId}/items`, { barcode }),
   updateItemQty: (orderId, productId, quantity) =>
     api.put(`/orders/${orderId}/items/${productId}`, { quantity }),
+  updateItemDiscount: (orderId, productId, discountPercentage) =>
+    api.patch(`/orders/${orderId}/items/${productId}/discount`, { discountPercentage }),
   removeItem: (orderId, productId) => api.delete(`/orders/${orderId}/items/${productId}`),
   complete: (orderId, paymentMethod) =>
     api.post(`/orders/${orderId}/complete`, { paymentMethod }),

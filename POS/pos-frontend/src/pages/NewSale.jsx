@@ -20,6 +20,8 @@ import {
   Mail,
   MapPin,
   PackagePlus,
+  PackageX,
+  Percent,
 } from 'lucide-react';
 import { orderApi, customerApi, productApi } from '../api';
 import { useToast } from '../hooks/useToast';
@@ -76,7 +78,15 @@ export default function NewSale() {
   const [addProductName, setAddProductName] = useState('');
   const [addProductPrice, setAddProductPrice] = useState('');
   const [addProductStock, setAddProductStock] = useState('1');
+  const [addProductShop, setAddProductShop] = useState('');
   const [addingProduct, setAddingProduct] = useState(false);
+  // Out of stock
+  const [outOfStockProduct, setOutOfStockProduct] = useState(null);
+  const [stockUpdateQty, setStockUpdateQty] = useState('1');
+  const [updatingStock, setUpdatingStock] = useState(false);
+  // Inline discount
+  const [discountItemId, setDiscountItemId] = useState(null);
+  const [discountValue, setDiscountValue] = useState('');
   const { showToast } = useToast();
 
   // Debounced customer search
@@ -129,13 +139,24 @@ export default function NewSale() {
       setProductSearch('');
       setProductResults([]);
       setShowAddProduct(false);
+      setOutOfStockProduct(null);
       showToast('Item added!', 'success');
     } catch (err) {
-      const msg = err.response?.data?.message || 'Product not found or out of stock';
-      showToast(msg, 'error');
-      // Offer to add the product
-      setAddProductBarcode(barcode);
-      setShowAddProduct(true);
+      const data = err.response?.data;
+      if (data?.errorCode === 'OUT_OF_STOCK') {
+        setOutOfStockProduct(data.product);
+        setStockUpdateQty('1');
+        setShowAddProduct(false);
+        showToast(`${data.product.name} is out of stock`, 'warning');
+      } else {
+        const msg = data?.message || 'Product not found';
+        showToast(msg, 'error');
+        setOutOfStockProduct(null);
+        setAddProductBarcode(barcode);
+        setShowAddProduct(true);
+      }
+      setProductSearch('');
+      setProductResults([]);
     }
   };
 
@@ -207,11 +228,21 @@ export default function NewSale() {
         setOrder(res.data);
         showToast('Item added!', 'success');
         setShowAddProduct(false);
+        setOutOfStockProduct(null);
       } catch (err) {
-        const msg = err.response?.data?.message || 'Product not found or out of stock';
-        showToast(msg, 'error');
-        setAddProductBarcode(barcode);
-        setShowAddProduct(true);
+        const data = err.response?.data;
+        if (data?.errorCode === 'OUT_OF_STOCK') {
+          setOutOfStockProduct(data.product);
+          setStockUpdateQty('1');
+          setShowAddProduct(false);
+          showToast(`${data.product.name} is out of stock`, 'warning');
+        } else {
+          const msg = data?.message || 'Product not found';
+          showToast(msg, 'error');
+          setOutOfStockProduct(null);
+          setAddProductBarcode(barcode);
+          setShowAddProduct(true);
+        }
       }
     },
     [order, showToast]
@@ -227,7 +258,7 @@ export default function NewSale() {
         sellingPrice: parseFloat(addProductPrice),
         quantityInStock: parseInt(addProductStock) || 1,
         category: '',
-        shop: '',
+        shop: addProductShop,
         costPrice: 0,
         description: '',
         reorderLevel: 5,
@@ -246,11 +277,56 @@ export default function NewSale() {
       setAddProductName('');
       setAddProductPrice('');
       setAddProductStock('1');
+      setAddProductShop('');
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to create product';
       showToast(msg, 'error');
     } finally {
       setAddingProduct(false);
+    }
+  };
+
+  const handleStockUpdate = async (e) => {
+    e.preventDefault();
+    if (!outOfStockProduct || !order) return;
+    setUpdatingStock(true);
+    try {
+      const qty = parseInt(stockUpdateQty) || 1;
+      await productApi.updateStock(outOfStockProduct.id, qty);
+      showToast(`Stock updated for ${outOfStockProduct.name}`, 'success');
+      // Now add it to the order
+      try {
+        const res = await orderApi.addItem(order.id, outOfStockProduct.barcode);
+        setOrder(res.data);
+        showToast('Item added to order!', 'success');
+      } catch {
+        showToast('Stock updated but could not add to order — try again', 'warning');
+      }
+      setOutOfStockProduct(null);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to update stock';
+      showToast(msg, 'error');
+    } finally {
+      setUpdatingStock(false);
+    }
+  };
+
+  const handleApplyDiscount = async (productId) => {
+    if (!order) return;
+    const pct = parseFloat(discountValue);
+    if (isNaN(pct) || pct < 0 || pct > 100) {
+      showToast('Enter a valid discount between 0 and 100', 'error');
+      return;
+    }
+    try {
+      const res = await orderApi.updateItemDiscount(order.id, productId, pct);
+      setOrder(res.data);
+      setDiscountItemId(null);
+      setDiscountValue('');
+      showToast(pct > 0 ? `${pct}% discount applied` : 'Discount removed', 'success');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to apply discount';
+      showToast(msg, 'error');
     }
   };
 
@@ -583,6 +659,36 @@ export default function NewSale() {
           </div>
         )}
 
+        {/* Out of Stock — Update Stock */}
+        {outOfStockProduct && (
+          <div className="card" style={{ padding: 16, marginBottom: 16, border: '2px solid var(--danger, #ef4444)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontSize: 14, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--danger, #ef4444)' }}>
+                <PackageX size={16} /> Out of Stock
+              </h3>
+              <button onClick={() => setOutOfStockProduct(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={16} /></button>
+            </div>
+            <div style={{ background: 'var(--bg)', borderRadius: 'var(--radius-sm)', padding: 12, marginBottom: 12 }}>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>{outOfStockProduct.name}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+                Barcode: {outOfStockProduct.barcode}
+                {outOfStockProduct.shop && <> • Shop: {outOfStockProduct.shop}</>}
+              </div>
+              <div style={{ fontWeight: 600, color: 'var(--primary)', marginTop: 4 }}>R{outOfStockProduct.sellingPrice.toFixed(2)}</div>
+              <div style={{ fontSize: 12, color: 'var(--danger, #ef4444)', marginTop: 4 }}>Current stock: {outOfStockProduct.quantityInStock}</div>
+            </div>
+            <form onSubmit={handleStockUpdate}>
+              <div className="input-group">
+                <label>Add Stock Quantity *</label>
+                <input type="number" min="1" value={stockUpdateQty} onChange={(e) => setStockUpdateQty(e.target.value)} required autoFocus />
+              </div>
+              <button type="submit" className="btn btn-success" disabled={updatingStock}>
+                {updatingStock ? <><span className="spinner" /> Updating...</> : <><Plus size={16} /> Update Stock & Add to Order</>}
+              </button>
+            </form>
+          </div>
+        )}
+
         {/* Quick Add Product (shown when scan/search fails) */}
         {showAddProduct && (
           <div className="card" style={{ padding: 16, marginBottom: 16, border: '2px solid var(--warning, #f59e0b)' }}>
@@ -611,6 +717,10 @@ export default function NewSale() {
                   <input type="number" min="1" value={addProductStock} onChange={(e) => setAddProductStock(e.target.value)} />
                 </div>
               </div>
+              <div className="input-group">
+                <label>Shop *</label>
+                <input type="text" value={addProductShop} onChange={(e) => setAddProductShop(e.target.value)} placeholder="e.g. Main Store" required />
+              </div>
               <button type="submit" className="btn btn-success" disabled={addingProduct}>
                 {addingProduct ? <><span className="spinner" /> Saving...</> : <><PackagePlus size={16} /> Add Product & Add to Order</>}
               </button>
@@ -626,28 +736,101 @@ export default function NewSale() {
             </h3>
 
             {order.items.map((item) => (
-              <div key={item.productId} className="order-item">
-                <div className="item-info">
-                  <div className="item-name">{item.productName}</div>
-                  <div className="item-price">
-                    {item.discountPercentage > 0 && (
-                      <span style={{ textDecoration: 'line-through', marginRight: 4 }}>
-                        R{item.unitPrice.toFixed(2)}
-                      </span>
+              <div key={item.productId}>
+                <div className="order-item">
+                  <div className="item-info">
+                    <div className="item-name">{item.productName}</div>
+                    <div className="item-price">
+                      {item.discountPercentage > 0 && (
+                        <span style={{ textDecoration: 'line-through', marginRight: 4 }}>
+                          R{item.unitPrice.toFixed(2)}
+                        </span>
+                      )}
+                      R{item.effectivePrice.toFixed(2)} each
+                      {item.discountPercentage > 0 && (
+                        <span style={{ fontSize: 11, color: 'var(--success, #16a34a)', marginLeft: 4 }}>
+                          -{item.discountPercentage}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="item-qty">
+                    <button onClick={() => handleUpdateQty(item.productId, item.quantity - 1)}>
+                      {item.quantity === 1 ? <Trash2 size={14} color="var(--danger)" /> : <Minus size={14} />}
+                    </button>
+                    <span>{item.quantity}</span>
+                    <button onClick={() => handleUpdateQty(item.productId, item.quantity + 1)}>
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                  <div className="item-total">
+                    R{item.lineTotal.toFixed(2)}
+                    {/* Discount button — only if no product-level discount */}
+                    {!item.isProductDiscount && (
+                      <button
+                        onClick={() => {
+                          setDiscountItemId(discountItemId === item.productId ? null : item.productId);
+                          setDiscountValue(item.discountPercentage > 0 ? String(item.discountPercentage) : '');
+                        }}
+                        title="Add discount"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer', padding: '2px 4px', marginLeft: 4,
+                          color: item.discountPercentage > 0 ? 'var(--success, #16a34a)' : 'var(--text-secondary)',
+                        }}
+                      >
+                        <Percent size={13} />
+                      </button>
                     )}
-                    R{item.effectivePrice.toFixed(2)} each
                   </div>
                 </div>
-                <div className="item-qty">
-                  <button onClick={() => handleUpdateQty(item.productId, item.quantity - 1)}>
-                    {item.quantity === 1 ? <Trash2 size={14} color="var(--danger)" /> : <Minus size={14} />}
-                  </button>
-                  <span>{item.quantity}</span>
-                  <button onClick={() => handleUpdateQty(item.productId, item.quantity + 1)}>
-                    <Plus size={14} />
-                  </button>
-                </div>
-                <div className="item-total">R{item.lineTotal.toFixed(2)}</div>
+                {/* Inline discount input */}
+                {discountItemId === item.productId && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 12px 10px', background: 'var(--bg)', borderRadius: '0 0 var(--radius-sm) var(--radius-sm)' }}>
+                    <Percent size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                      placeholder="Discount %"
+                      autoFocus
+                      style={{ flex: 1, padding: '6px 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', fontSize: 13 }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleApplyDiscount(item.productId); if (e.key === 'Escape') { setDiscountItemId(null); setDiscountValue(''); } }}
+                    />
+                    <button
+                      className="btn btn-success btn-sm"
+                      onClick={() => handleApplyDiscount(item.productId)}
+                      style={{ width: 'auto', padding: '6px 12px', fontSize: 12 }}
+                    >
+                      Apply
+                    </button>
+                    {item.discountPercentage > 0 && (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        onClick={async () => {
+                          try {
+                            const res = await orderApi.updateItemDiscount(order.id, item.productId, 0);
+                            setOrder(res.data);
+                            setDiscountItemId(null);
+                            setDiscountValue('');
+                            showToast('Discount removed', 'success');
+                          } catch { showToast('Failed to remove discount', 'error'); }
+                        }}
+                        style={{ width: 'auto', padding: '6px 10px', fontSize: 12, color: 'var(--danger)' }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setDiscountItemId(null); setDiscountValue(''); }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

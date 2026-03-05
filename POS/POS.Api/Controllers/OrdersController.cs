@@ -51,10 +51,28 @@ public class OrdersController : ControllerBase
     [HttpPost("{id}/items")]
     public async Task<ActionResult<Order>> AddItem(string id, [FromBody] AddItemRequest request)
     {
-        var order = await _orderService.AddItemToOrderAsync(id, request.Barcode);
-        if (order == null)
-            return BadRequest(new { message = "Could not add item. Check that the order is pending, product exists, and is in stock." });
-        return Ok(order);
+        var result = await _orderService.AddItemToOrderAsync(id, request.Barcode);
+        if (result.Success) return Ok(result.Order);
+
+        return result.ErrorCode switch
+        {
+            "OUT_OF_STOCK" => Conflict(new
+            {
+                message = "Product is out of stock.",
+                errorCode = "OUT_OF_STOCK",
+                product = new
+                {
+                    id = result.Product!.Id,
+                    name = result.Product.Name,
+                    barcode = result.Product.Barcode,
+                    sellingPrice = result.Product.SellingPrice,
+                    quantityInStock = result.Product.QuantityInStock,
+                    shop = result.Product.Shop
+                }
+            }),
+            "NOT_FOUND" => NotFound(new { message = "Product not found.", errorCode = "NOT_FOUND" }),
+            _ => BadRequest(new { message = "Could not add item. Check that the order is pending.", errorCode = "ORDER_INVALID" })
+        };
     }
 
     [HttpPut("{id}/items/{productId}")]
@@ -70,6 +88,15 @@ public class OrdersController : ControllerBase
     {
         var order = await _orderService.RemoveItemFromOrderAsync(id, productId);
         if (order == null) return BadRequest(new { message = "Could not remove item." });
+        return Ok(order);
+    }
+
+    [HttpPatch("{id}/items/{productId}/discount")]
+    public async Task<ActionResult<Order>> UpdateItemDiscount(string id, string productId, [FromBody] UpdateItemDiscountRequest request)
+    {
+        var order = await _orderService.UpdateItemDiscountAsync(id, productId, request.DiscountPercentage);
+        if (order == null)
+            return BadRequest(new { message = "Could not update discount. Product may have a product-level discount." });
         return Ok(order);
     }
 
@@ -156,4 +183,9 @@ public class UpdateQuantityRequest
 public class CompleteOrderRequest
 {
     public PaymentMethod PaymentMethod { get; set; }
+}
+
+public class UpdateItemDiscountRequest
+{
+    public decimal DiscountPercentage { get; set; }
 }
