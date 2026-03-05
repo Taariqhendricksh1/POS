@@ -109,6 +109,7 @@ export const stockTransferApi = {
   complete: (transferId) => api.post(`/stock-transfers/${transferId}/complete`),
   cancel: (transferId) => api.post(`/stock-transfers/${transferId}/cancel`),
   delete: (transferId) => api.delete(`/stock-transfers/${transferId}`),
+  getSummary: (from, to) => api.get('/stock-transfers/summary', { params: { from, to } }),
 };
 
 // Customers API

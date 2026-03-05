@@ -91,6 +91,15 @@ public class StockTransfersController : ControllerBase
         if (!deleted) return BadRequest(new { message = "Cannot delete transfer. It may be completed or not found." });
         return Ok(new { message = "Transfer deleted successfully" });
     }
+
+    [HttpGet("summary")]
+    public async Task<ActionResult<TransferSummary>> GetSummary([FromQuery] DateTime? from, [FromQuery] DateTime? to)
+    {
+        var fromDate = from ?? DateTime.UtcNow.Date;
+        var toDate = to ?? DateTime.UtcNow.Date.AddDays(1).AddTicks(-1);
+        var summary = await _transferService.GetTransferSummaryAsync(fromDate, toDate);
+        return Ok(summary);
+    }
 }
 
 public class CreateTransferRequest

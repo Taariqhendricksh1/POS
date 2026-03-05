@@ -21,7 +21,7 @@ import {
   Clock,
   CheckCircle2,
 } from 'lucide-react';
-import { productApi, orderApi, settingsApi } from '../api';
+import { productApi, orderApi, settingsApi, stockTransferApi } from '../api';
 import { ShopContext } from '../App';
 
 function formatDate(date) {
@@ -127,6 +127,8 @@ export default function Dashboard() {
   // Sales summary
   const [salesSummary, setSalesSummary] = useState(null);
   const [salesLoading, setSalesLoading] = useState(false);
+  const [transferSummary, setTransferSummary] = useState(null);
+  const [transferLoading, setTransferLoading] = useState(false);
   const [datePreset, setDatePreset] = useState('today');
   const [dateFrom, setDateFrom] = useState(formatDate(new Date()));
   const [dateTo, setDateTo] = useState(formatDate(new Date()));
@@ -142,6 +144,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadSalesSummary();
+    loadTransferSummary();
   }, [selectedShop]);
 
   const loadShops = async () => {
@@ -185,6 +188,20 @@ export default function Dashboard() {
     }
   };
 
+  const loadTransferSummary = async (from, to) => {
+    setTransferLoading(true);
+    try {
+      const fromParam = (from || dateFrom) + 'T00:00:00Z';
+      const toParam = (to || dateTo) + 'T23:59:59Z';
+      const res = await stockTransferApi.getSummary(fromParam, toParam);
+      setTransferSummary(res.data);
+    } catch (err) {
+      console.error('Transfer summary load error:', err);
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
   const handlePresetChange = (preset) => {
     setDatePreset(preset);
     if (preset !== 'custom') {
@@ -192,6 +209,7 @@ export default function Dashboard() {
       setDateFrom(from);
       setDateTo(to);
       loadSalesSummary(from, to);
+      loadTransferSummary(from, to);
     }
   };
 
@@ -200,6 +218,7 @@ export default function Dashboard() {
     setDateTo(newTo);
     setDatePreset('custom');
     loadSalesSummary(newFrom, newTo);
+    loadTransferSummary(newFrom, newTo);
   };
 
   if (loading) {
@@ -495,6 +514,77 @@ export default function Dashboard() {
           <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
             <CheckCircle2 size={28} style={{ marginBottom: 6, opacity: 0.4 }} />
             <p style={{ margin: 0, fontSize: 14 }}>No pending EFT transactions for this period</p>
+          </div>
+        )}
+      </Accordion>
+
+      {/* === ACCORDION: Stock Transfers === */}
+      <Accordion
+        title="Stock Transfers"
+        icon={<ArrowRightLeft size={16} color="var(--primary)" />}
+        defaultOpen={false}
+      >
+        {transferLoading ? (
+          <div style={{ textAlign: 'center', padding: 24 }}>
+            <div className="spinner" style={{ borderTopColor: 'var(--primary)', borderColor: 'var(--border)' }} />
+          </div>
+        ) : transferSummary && transferSummary.totalTransfers > 0 ? (
+          <>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-label">
+                  <ArrowRightLeft size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                  Transfers
+                </div>
+                <div className="stat-value">{transferSummary.totalTransfers}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">
+                  <Package size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                  Units Moved
+                </div>
+                <div className="stat-value">{transferSummary.totalUnits}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">
+                  <DollarSign size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                  Cost Value
+                </div>
+                <div className="stat-value">R{transferSummary.totalCostValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-label">
+                  <DollarSign size={14} style={{ verticalAlign: -2, marginRight: 4 }} />
+                  Retail Value
+                </div>
+                <div className="stat-value">R{transferSummary.totalRetailValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+            </div>
+
+            {/* Recipient Breakdown */}
+            {transferSummary.byRecipient?.length > 0 && (
+              <div style={{ marginTop: 14 }}>
+                <h4 style={{ fontSize: 12, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: 10 }}>By Recipient</h4>
+                {transferSummary.byRecipient.map((r) => (
+                  <div key={r.company} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{r.company}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                        {r.transferCount} transfer{r.transferCount !== 1 ? 's' : ''} &bull; {r.totalUnits} units
+                      </div>
+                    </div>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>
+                      R{r.totalCostValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-secondary)' }}>
+            <ArrowRightLeft size={28} style={{ marginBottom: 6, opacity: 0.4 }} />
+            <p style={{ margin: 0, fontSize: 14 }}>No stock transfers for this period</p>
           </div>
         )}
       </Accordion>

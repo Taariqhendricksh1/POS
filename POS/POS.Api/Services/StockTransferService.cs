@@ -173,4 +173,63 @@ public class StockTransferService
         transfer.TotalItems = transfer.Items.Count;
         transfer.TotalQuantity = transfer.Items.Sum(i => i.Quantity);
     }
+
+    public async Task<TransferSummary> GetTransferSummaryAsync(DateTime from, DateTime to)
+    {
+        var transfers = await _transfers.Find(t =>
+            t.Status == TransferStatus.Completed &&
+            t.CompletedAt >= from &&
+            t.CompletedAt <= to
+        ).ToListAsync();
+
+        var totalTransfers = transfers.Count;
+        var totalUnits = transfers.Sum(t => t.TotalQuantity);
+        var totalProducts = transfers.Sum(t => t.TotalItems);
+        var totalCostValue = transfers.Sum(t => t.Items.Sum(i => i.CostPrice * i.Quantity));
+        var totalRetailValue = transfers.Sum(t => t.Items.Sum(i => i.SellingPrice * i.Quantity));
+
+        var byRecipient = transfers
+            .GroupBy(t => t.RecipientCompany)
+            .Select(g => new RecipientBreakdown
+            {
+                Company = g.Key,
+                TransferCount = g.Count(),
+                TotalUnits = g.Sum(t => t.TotalQuantity),
+                TotalCostValue = g.Sum(t => t.Items.Sum(i => i.CostPrice * i.Quantity))
+            })
+            .OrderByDescending(r => r.TotalUnits)
+            .ToList();
+
+        return new TransferSummary
+        {
+            From = from,
+            To = to,
+            TotalTransfers = totalTransfers,
+            TotalUnits = totalUnits,
+            TotalProducts = totalProducts,
+            TotalCostValue = totalCostValue,
+            TotalRetailValue = totalRetailValue,
+            ByRecipient = byRecipient
+        };
+    }
+}
+
+public class TransferSummary
+{
+    public DateTime From { get; set; }
+    public DateTime To { get; set; }
+    public int TotalTransfers { get; set; }
+    public int TotalUnits { get; set; }
+    public int TotalProducts { get; set; }
+    public decimal TotalCostValue { get; set; }
+    public decimal TotalRetailValue { get; set; }
+    public List<RecipientBreakdown> ByRecipient { get; set; } = new();
+}
+
+public class RecipientBreakdown
+{
+    public string Company { get; set; } = string.Empty;
+    public int TransferCount { get; set; }
+    public int TotalUnits { get; set; }
+    public decimal TotalCostValue { get; set; }
 }
