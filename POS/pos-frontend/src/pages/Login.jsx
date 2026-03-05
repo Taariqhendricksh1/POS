@@ -30,13 +30,20 @@ export default function Login() {
 
   const handleWake = async () => {
     setWaking(true);
-    setWakeMsg('');
+    setWakeMsg('Waking backend — this can take up to 2 minutes on free tier...');
     try {
-      const res = await fetch('/api/health');
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000);
+      const res = await fetch('/api/health', { signal: controller.signal });
+      clearTimeout(timeout);
       const data = await res.json();
       setWakeMsg(data.message || 'Backend is awake');
-    } catch {
-      setWakeMsg('Could not reach backend');
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        setWakeMsg('Timed out — backend may still be starting, try again');
+      } else {
+        setWakeMsg('Could not reach backend — try again in a moment');
+      }
     } finally {
       setWaking(false);
     }
@@ -178,7 +185,13 @@ export default function Login() {
             )}
           </button>
           {wakeMsg && (
-            <div style={{ fontSize: 11, color: wakeMsg.includes('Could not') ? 'var(--danger)' : 'var(--success, #16a34a)', marginTop: 4 }}>
+            <div style={{
+              fontSize: 11,
+              color: wakeMsg.includes('awake') ? 'var(--success, #16a34a)'
+                : wakeMsg.includes('Could not') || wakeMsg.includes('Timed out') ? 'var(--danger)'
+                : 'var(--text-secondary)',
+              marginTop: 4,
+            }}>
               {wakeMsg}
             </div>
           )}
